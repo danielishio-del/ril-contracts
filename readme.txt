@@ -1,7 +1,7 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.4.3
+Stable tag: 1.4.4
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
