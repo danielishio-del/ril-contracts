@@ -81,9 +81,20 @@ function ril_install_tables() {
 	$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $templates" );
 	if ( $count > 0 ) {
 		// Atualiza o modelo padrão antigo, só se ninguém editou o texto.
+		// Trocas pontuais que valem mesmo se o modelo foi editado (valores e dados do estúdio que mudaram).
+		$fixes = array(
+			'Engagement Session ($570 value)'                      => 'Engagement Session ($560 value)',
+			'78206 Varner Rd Suite D #1008, Palm Desert, CA 92211' => '68695 F St, Cathedral City, CA 92234, United States',
+		);
 		foreach ( $wpdb->get_results( "SELECT id, body FROM $templates", ARRAY_A ) as $row ) {
-			if ( in_array( hash( 'sha256', $row['body'] ), explode( ',', RIL_DEFAULT_TEMPLATE_OLD_HASHES ), true ) ) {
+			$plain = str_replace( "\r\n", "\n", $row['body'] );
+			if ( in_array( hash( 'sha256', $plain ), explode( ',', RIL_DEFAULT_TEMPLATE_OLD_HASHES ), true ) ) {
 				$wpdb->update( $templates, array( 'body' => $tpl['body'], 'updated_at' => ril_now() ), array( 'id' => $row['id'] ) );
+				continue;
+			}
+			$fixed = strtr( $row['body'], $fixes );
+			if ( $fixed !== $row['body'] ) {
+				$wpdb->update( $templates, array( 'body' => $fixed, 'updated_at' => ril_now() ), array( 'id' => $row['id'] ) );
 			}
 		}
 	}
