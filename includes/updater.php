@@ -2,7 +2,7 @@
 /**
  * Atualizações pelo GitHub.
  *
- * O plugin olha a última "release" do repositório configurado. Se a versão for maior que a instalada,
+ * O plugin olha o código mais recente do repositório configurado (branch main). Se a versão for maior que a instalada,
  * o WordPress mostra "Atualização disponível" na tela de Plugins (e instala sozinho, se a atualização
  * automática estiver ligada). Funciona com repositório privado usando uma chave de leitura (token).
  */
@@ -11,13 +11,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class RIL_Updater {
-	const CACHE = 'ril_contracts_release';
+	const CACHE  = 'ril_contracts_release';
+	const BRANCH = 'main';
 
 	public static function init() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject' ) );
 		add_filter( 'site_transient_update_plugins', array( __CLASS__, 'inject' ) );
 		add_filter( 'plugins_api', array( __CLASS__, 'info' ), 20, 3 );
 		add_filter( 'upgrader_pre_download', array( __CLASS__, 'download' ), 10, 4 );
+		add_filter( 'upgrader_source_selection', array( __CLASS__, 'fix_folder' ), 10, 4 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'clear' ), 10, 0 );
 	}
 
@@ -49,7 +51,7 @@ class RIL_Updater {
 		return $headers;
 	}
 
-	/** Última release (com cache de 6 horas). Devolve array ou WP_Error. */
+	/** Versão mais recente no GitHub (com cache de 6 horas). Devolve array ou WP_Error. */
 	public static function release( $force = false ) {
 		$repo = self::repo();
 		if ( ! $repo ) {
@@ -69,7 +71,8 @@ class RIL_Updater {
 	}
 
 	private static function fetch( $repo ) {
-		$res = wp_remote_get( self::api_base() . '/repos/' . $repo . '/releases/latest', array(
+		$api = self::api_base() . '/repos/' . $repo;
+		$res = wp_remote_get( $api . '/commits/' . self::BRANCH, array(
 			'headers' => self::headers(),
 			'timeout' => 15,
 		) );
@@ -78,29 +81,56 @@ class RIL_Updater {
 		}
 		$code = wp_remote_retrieve_response_code( $res );
 		if ( 200 !== $code ) {
-			$msg = 404 === $code ? 'Repositório ou release não encontrado (confira o nome e a chave de acesso).' : ( 401 === $code ? 'Chave de acesso inválida.' : 'GitHub respondeu ' . $code . '.' );
+			$msg = in_array( $code, array( 404, 422 ), true ) ? 'Repositório não encontrado (confira o nome e a chave de acesso).' : ( 401 === $code ? 'Chave de acesso inválida.' : 'GitHub respondeu ' . $code . '.' );
 			return new WP_Error( 'ril_http', $msg );
 		}
-		$data  = json_decode( wp_remote_retrieve_body( $res ), true );
-		$asset = null;
-		foreach ( (array) ( isset( $data['assets'] ) ? $data['assets'] : array() ) as $a ) {
-			if ( isset( $a['name'] ) && preg_match( '/^ril-contracts.*\.zip$/i', $a['name'] ) ) {
-				$asset = $a;
-				break;
-			}
+		$commit = json_decode( wp_remote_retrieve_body( $res ), true );
+		if ( empty( $commit['sha'] ) ) {
+			return new WP_Error( 'ril_http', 'Resposta inesperada do GitHub.' );
 		}
-		if ( ! $asset ) {
-			return new WP_Error( 'ril_no_asset', 'A release não tem o arquivo ril-contracts.zip.' );
+		$sha = (string) $commit['sha'];
+
+		// Lê a versão no cabeçalho do arquivo principal do plugin, naquele commit.
+		$res = wp_remote_get( $api . '/contents/ril-contracts.php?ref=' . rawurlencode( $sha ), array(
+			'headers' => self::headers( 'application/vnd.github.raw' ),
+			'timeout' => 15,
+		) );
+		if ( is_wp_error( $res ) ) {
+			return $res;
 		}
-		$release = array(
+		if ( 200 !== wp_remote_retrieve_response_code( $res ) || ! preg_match( '/^[ \t\/*#@]*Version:\s*([0-9][0-9A-Za-z.\-]*)/mi', wp_remote_retrieve_body( $res ), $m ) ) {
+			return new WP_Error( 'ril_no_version', 'Não encontrei a versão do plugin no repositório.' );
+		}
+		return array(
 			'repo'      => $repo,
-			'version'   => ltrim( (string) $data['tag_name'], 'vV' ),
-			'notes'     => isset( $data['body'] ) ? (string) $data['body'] : '',
-			'published' => isset( $data['published_at'] ) ? (string) $data['published_at'] : '',
-			'asset_api' => self::api_base() . '/repos/' . $repo . '/releases/assets/' . (int) $asset['id'],
-			'html_url'  => isset( $data['html_url'] ) ? (string) $data['html_url'] : '',
+			'version'   => $m[1],
+			'notes'     => isset( $commit['commit']['message'] ) ? (string) $commit['commit']['message'] : '',
+			'published' => isset( $commit['commit']['committer']['date'] ) ? (string) $commit['commit']['committer']['date'] : '',
+			'asset_api' => $api . '/zipball/' . $sha,
+			'html_url'  => 'https://github.com/' . $repo,
 		);
-		return $release;
+	}
+
+	/**
+	 * O zip do GitHub vem dentro de uma pasta "usuario-ril-contracts-abc123".
+	 * Renomeia para "ril-contracts" para o WordPress substituir o plugin certo.
+	 */
+	public static function fix_folder( $source, $remote_source, $upgrader, $hook_extra = array() ) {
+		global $wp_filesystem;
+		if ( empty( $hook_extra['plugin'] ) || self::basename() !== $hook_extra['plugin'] || ! $wp_filesystem ) {
+			return $source;
+		}
+		$want = trailingslashit( $remote_source ) . dirname( self::basename() ) . '/';
+		if ( untrailingslashit( $source ) === untrailingslashit( $want ) ) {
+			return $source;
+		}
+		if ( ! $wp_filesystem->exists( trailingslashit( $source ) . 'ril-contracts.php' ) ) {
+			return new WP_Error( 'ril_bad_zip', 'O arquivo baixado não parece ser o plugin de contratos.' );
+		}
+		if ( ! $wp_filesystem->move( $source, $want, true ) ) {
+			return new WP_Error( 'ril_bad_zip', 'Não consegui preparar a pasta da atualização.' );
+		}
+		return $want;
 	}
 
 	/** Versão do arquivo no disco (vale mesmo logo depois de uma atualização, no mesmo carregamento). */
@@ -177,11 +207,13 @@ class RIL_Updater {
 	 */
 	public static function download( $reply, $package, $upgrader, $hook_extra = array() ) {
 		$api = self::api_base() . '/repos/';
-		if ( ! is_string( $package ) || 0 !== strpos( $package, $api ) || false === strpos( $package, '/releases/assets/' ) ) {
+		$is_asset = is_string( $package ) && false !== strpos( $package, '/releases/assets/' );
+		$is_zip   = is_string( $package ) && false !== strpos( $package, '/zipball/' );
+		if ( ! is_string( $package ) || 0 !== strpos( $package, $api ) || ( ! $is_asset && ! $is_zip ) ) {
 			return $reply;
 		}
 		$res = wp_remote_get( $package, array(
-			'headers'     => self::headers( 'application/octet-stream' ),
+			'headers'     => self::headers( $is_asset ? 'application/octet-stream' : 'application/vnd.github+json' ),
 			'redirection' => 0,
 			'timeout'     => 30,
 		) );
