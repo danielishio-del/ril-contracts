@@ -81,17 +81,34 @@ function ril_contract_package_fields( $c ) {
 }
 
 /** Valores automáticos do modelo ({{total}}, {{deposit}}...) para um contrato. */
-function ril_auto_values( $name, $date, $total, $deposit, $created_at ) {
+function ril_auto_values( $name, $date, $total, $deposit, $created_at, $prepaid = 0, $prepaid_note = '' ) {
 	$s = ril_settings();
 	return array(
-		'studio_name'  => $s['studio_name'],
-		'client_names' => $name,
-		'wedding_date' => ril_long_date( $date ),
-		'total'        => ril_money( $total ),
-		'deposit'      => ril_money( $deposit ),
-		'balance'      => ril_money( max( 0, $total - $deposit ) ),
-		'today'        => gmdate( 'F j, Y', $created_at ? strtotime( $created_at . ' UTC' ) : time() ),
+		'studio_name'     => $s['studio_name'],
+		'client_names'    => $name,
+		'wedding_date'    => ril_long_date( $date ),
+		'total'           => ril_money( $total ),
+		'deposit'         => ril_money( $deposit ),
+		'deposit_percent' => ril_percent_label( $deposit, $total ),
+		'prepaid'         => $prepaid > 0 ? ril_money( $prepaid ) . ( '' !== $prepaid_note ? ' (' . $prepaid_note . ')' : '' ) : '',
+		'balance'         => ril_money( ril_balance_cents( $total, $deposit, $prepaid ) ),
+		'today'           => gmdate( 'F j, Y', $created_at ? strtotime( $created_at . ' UTC' ) : time() ),
 	);
+}
+
+/** Campos de valores (Total, Sinal, Pago antes) com o cálculo automático na tela. */
+function ril_money_inputs( $total = null, $deposit = null, $prepaid = 0, $note = '' ) {
+	$s   = ril_settings();
+	$fmt = function ( $c ) {
+		return null === $c ? '' : number_format( $c / 100, 2, '.', ',' );
+	};
+	$h  = '<div class="ril-grid" data-ril-money data-pct="' . esc_attr( $s['deposit_percent'] ) . '">';
+	$h .= '<label class="ril-field"><span>Total (US$)</span><input name="total" inputmode="decimal" placeholder="5,400.00" value="' . esc_attr( $fmt( $total ) ) . '"></label>';
+	$h .= '<label class="ril-field"><span>Sinal (US$)</span><input name="deposit" inputmode="decimal" placeholder="Calculado sozinho" value="' . esc_attr( $fmt( $deposit ) ) . '"><small>' . esc_html( $s['deposit_percent'] ) . '% do total, calculado sozinho. Pode mudar.</small></label>';
+	$h .= '<label class="ril-field"><span>Pago antes (opcional)</span><input name="prepaid" inputmode="decimal" placeholder="0.00" value="' . esc_attr( $prepaid ? $fmt( $prepaid ) : '' ) . '"><small>Algo que o casal já pagou antes do contrato. É descontado do saldo.</small></label>';
+	$h .= '<label class="ril-field"><span>O que foi pago antes (opcional)</span><input name="prepaid_note" maxlength="120" placeholder="ex.: engagement session paid on May 2" value="' . esc_attr( $note ) . '"><small>Aparece no contrato, em inglês.</small></label>';
+	$h .= '</div><p class="ril-money-sum ril-small" data-ril-money-sum></p>';
+	return $h;
 }
 
 function ril_wedding_cell( $r ) {
@@ -198,8 +215,10 @@ function ril_page_contract( $id ) {
 		echo '<label class="ril-field"><span>Nomes do casal</span><input name="client_name" value="' . esc_attr( $c['client_name'] ) . '"></label>';
 		echo '<label class="ril-field"><span>E-mail do casal</span><input type="email" name="client_email" value="' . esc_attr( $c['client_email'] ) . '"></label>';
 		echo '<label class="ril-field"><span>Link vale por (dias)</span><input type="number" min="1" max="365" name="link_days" value="' . esc_attr( $c['link_days'] ) . '"></label>';
-		echo '<label class="ril-field"><span>Total (US$)</span><input name="total" inputmode="decimal" value="' . esc_attr( number_format( $c['total_cents'] / 100, 2, '.', ',' ) ) . '"></label>';
-		echo '<label class="ril-field"><span>Sinal (US$)</span><input name="deposit" inputmode="decimal" value="' . esc_attr( number_format( $c['deposit_cents'] / 100, 2, '.', ',' ) ) . '"></label>';
+		echo '</div>';
+		list( $pp, $pn ) = ril_prepaid( $c );
+		echo ril_money_inputs( $c['total_cents'], $c['deposit_cents'], $pp, $pn ); // phpcs:ignore
+		echo '<div class="ril-grid">';
 		foreach ( ril_contract_package_fields( $c ) as $f => $opts ) {
 			$val = isset( $c['studio_fields'][ $f ] ) ? (string) $c['studio_fields'][ $f ] : '';
 			echo '<label class="ril-field"><span>' . esc_html( $f ) . '</span>' . ril_package_input( $f, $opts, $val ) . '</label>'; // phpcs:ignore
@@ -314,7 +333,7 @@ function ril_page_contract( $id ) {
 	}
 
 	if ( $c['total_cents'] > 0 || $c['deposit_cents'] > 0 ) {
-		echo '<div class="ril-card"><h3>Pagamento</h3><dl class="ril-kv"><dt>Total</dt><dd>' . esc_html( ril_money( $c['total_cents'] ) ) . '</dd><dt>Sinal</dt><dd>' . esc_html( ril_money( $c['deposit_cents'] ) ) . '</dd><dt>Saldo</dt><dd>' . esc_html( ril_money( max( 0, $c['total_cents'] - $c['deposit_cents'] ) ) ) . '</dd><dt>Status</dt><dd>' . ril_badge( $c['payment_status'] ) . '</dd></dl>'; // phpcs:ignore
+		echo '<div class="ril-card"><h3>Pagamento</h3><dl class="ril-kv"><dt>Total</dt><dd>' . esc_html( ril_money( $c['total_cents'] ) ) . '</dd><dt>Sinal</dt><dd>' . esc_html( ril_money( $c['deposit_cents'] ) . ( $c['total_cents'] > 0 ? ' (' . ril_percent_label( $c['deposit_cents'], $c['total_cents'] ) . ')' : '' ) ) . '</dd>' . ( ril_prepaid( $c )[0] > 0 ? '<dt>Pago antes</dt><dd>' . esc_html( ril_money( ril_prepaid( $c )[0] ) ) . '</dd>' : '' ) . '<dt>Saldo</dt><dd>' . esc_html( ril_money( ril_balance_cents( $c['total_cents'], $c['deposit_cents'], ril_prepaid( $c )[0] ) ) ) . '</dd><dt>Status</dt><dd>' . ril_badge( $c['payment_status'] ) . '</dd></dl>'; // phpcs:ignore
 		echo '<div class="ril-actions" style="margin-top:12px">';
 		foreach ( array( 'deposit_paid' => 'Sinal recebido', 'paid_in_full' => 'Pago total', 'unpaid' => 'Voltar a pendente' ) as $p => $label ) {
 			if ( $p !== $c['payment_status'] ) {
@@ -385,10 +404,8 @@ function ril_page_new() {
 	if ( preg_match( '/\{\{\s*wedding_date\s*\}\}/', $tpl['body'] ) ) {
 		echo '<label class="ril-field"><span>Data do casamento</span><input type="date" name="wedding_date"></label>';
 	}
-	echo '</div><h3>Valores (US$)</h3><div class="ril-grid">';
-	echo '<label class="ril-field"><span>Total</span><input name="total" inputmode="decimal" placeholder="5,400.00"></label>';
-	echo '<label class="ril-field"><span>Sinal</span><input name="deposit" inputmode="decimal" placeholder="2,160.00"></label>';
-	echo '</div>';
+	echo '</div><h3>Valores (US$)</h3>';
+	echo ril_money_inputs(); // phpcs:ignore
 	$client_fields = ril_client_field_names( $tpl['body'] );
 	if ( $client_fields ) {
 		echo '<p class="ril-small ril-muted" style="margin-top:-4px">O casal preenche ao assinar: ' . esc_html( implode( ', ', $client_fields ) ) . '.</p>';
@@ -440,7 +457,7 @@ function ril_page_templates() {
 	echo '<p><code># Título</code> e <code>## Seção</code> viram títulos. Linha em branco separa parágrafos. <code>- item</code> vira lista.</p>';
 	echo '<p><code>{{Local}}</code> = campo que <b>vocês</b> preenchem ao criar o contrato.</p>';
 	echo '<p><code>[[Endereço]]</code> = campo que <b>o casal</b> preenche antes de assinar.</p>';
-	echo '<p>Preenchidos sozinhos: <code>{{client_names}}</code> <code>{{wedding_date}}</code> <code>{{total}}</code> <code>{{deposit}}</code> <code>{{balance}}</code> <code>{{studio_name}}</code> <code>{{today}}</code></p></div>';
+	echo '<p>Preenchidos sozinhos: <code>{{client_names}}</code> <code>{{wedding_date}}</code> <code>{{total}}</code> <code>{{deposit}}</code> <code>{{deposit_percent}}</code> <code>{{prepaid}}</code> <code>{{balance}}</code> <code>{{studio_name}}</code> <code>{{today}}</code></p><p>Uma linha que começa com <code>??</code> só aparece no contrato quando tem valor (ex.: <code>?? Paid in advance: {{prepaid}}</code>).</p></div>';
 	if ( $tpl ) {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" data-confirm="Apagar este modelo? Contratos já criados não mudam.">';
 		wp_nonce_field( 'ril_template_delete' );
@@ -488,7 +505,8 @@ function ril_page_settings() {
 	echo '<h3>Pagamento</h3>';
 	echo '<label class="ril-field"><span>Instruções de pagamento (em inglês, o casal vê depois de assinar)</span><textarea name="payment_instructions" rows="4" placeholder="Zelle: payments@rockerinlove.com (Rocker in Love)&#10;Please include your names in the memo.">' . esc_textarea( $s['payment_instructions'] ) . '</textarea></label>';
 	echo '<div class="ril-grid"><label class="ril-field"><span>Link do PayPal (opcional)</span><input name="paypal_link" value="' . esc_attr( $s['paypal_link'] ) . '" placeholder="https://paypal.me/rockerinlove"><small>Se for paypal.me, o valor entra no link sozinho.</small></label>';
-	echo '<label class="ril-field"><span>Taxa do PayPal (%)</span><input name="paypal_fee_percent" inputmode="decimal" value="' . esc_attr( $s['paypal_fee_percent'] ) . '"><small>Somada ao sinal quando o casal paga pelo PayPal.</small></label></div>';
+	echo '<label class="ril-field"><span>Taxa do PayPal (%)</span><input name="paypal_fee_percent" inputmode="decimal" value="' . esc_attr( $s['paypal_fee_percent'] ) . '"><small>Somada ao sinal quando o casal paga pelo PayPal.</small></label>';
+	echo '<label class="ril-field"><span>Sinal padrão (% do total)</span><input name="deposit_percent" inputmode="decimal" value="' . esc_attr( $s['deposit_percent'] ) . '"><small>Calculado sozinho no Novo contrato. Dá para mudar em cada contrato.</small></label></div>';
 	echo '<h3>Atualizações automáticas (GitHub)</h3><div class="ril-grid">';
 	echo '<label class="ril-field"><span>Repositório</span><input name="update_repo" value="' . esc_attr( $s['update_repo'] ) . '" placeholder="seu-usuario/ril-contracts"></label>';
 	echo '<label class="ril-field"><span>Chave de acesso (só se o repositório for privado)</span><input type="password" name="update_token" autocomplete="off" value="" placeholder="' . esc_attr( $s['update_token'] ? 'Chave salva. Deixe em branco para manter.' : 'github_pat_…' ) . '"></label>';
@@ -533,6 +551,7 @@ add_action( 'admin_post_ril_settings', function () {
 		'payment_instructions' => sanitize_textarea_field( ril_post_text( 'payment_instructions' ) ),
 		'paypal_link'          => esc_url_raw( ril_post( 'paypal_link' ) ),
 		'paypal_fee_percent'   => max( 0, min( 20, (float) str_replace( ',', '.', ril_post( 'paypal_fee_percent', '0' ) ) ) ),
+		'deposit_percent'      => max( 0, min( 100, (float) str_replace( ',', '.', ril_post( 'deposit_percent', '40' ) ) ) ),
 		'logo_id'              => (int) ril_post( 'logo_id', 0 ),
 		'from_name'            => ril_post( 'from_name' ) ? ril_post( 'from_name' ) : 'Rocker in Love',
 		'update_repo'          => ril_post( 'update_repo' ),
@@ -585,7 +604,9 @@ add_action( 'admin_post_ril_create', function () {
 	$s       = ril_settings();
 	$client  = ril_post( 'client_name' );
 	$total   = ril_parse_money( ril_post( 'total' ) );
-	$deposit = ril_parse_money( ril_post( 'deposit' ) );
+	$deposit = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ril_default_deposit( $total );
+	$prepaid = ril_parse_money( ril_post( 'prepaid' ) );
+	$pnote   = $prepaid > 0 ? ril_post( 'prepaid_note' ) : '';
 	$date    = preg_match( '/^\d{4}-\d{2}-\d{2}$/', ril_post( 'wedding_date' ) ) ? ril_post( 'wedding_date' ) : '';
 	if ( '' === $client ) {
 		wp_die( 'Informe o nome do casal.' );
@@ -595,21 +616,13 @@ add_action( 'admin_post_ril_create', function () {
 	foreach ( ril_studio_field_names( $tpl['body'] ) as $f ) {
 		$custom[ $f ] = isset( $posted[ $f ] ) ? sanitize_text_field( $posted[ $f ] ) : '';
 	}
-	$auto = array(
-		'studio_name'  => $s['studio_name'],
-		'client_names' => $client,
-		'wedding_date' => ril_long_date( $date ),
-		'total'        => ril_money( $total ),
-		'deposit'      => ril_money( $deposit ),
-		'balance'      => ril_money( max( 0, $total - $deposit ) ),
-		'today'        => gmdate( 'F j, Y' ),
-	);
+	$auto = ril_auto_values( $client, $date, $total, $deposit, null, $prepaid, $pnote );
 	$wpdb->insert( ril_table( 'contracts' ), array(
 		'token'         => ril_new_token(),
 		'template_id'   => $tpl['id'],
 		'title'         => ril_post( 'title', $tpl['name'] ),
 		'body'          => ril_fill_studio( $tpl['body'], array_merge( $auto, array_filter( $custom, 'strlen' ) ) ),
-		'studio_fields' => wp_json_encode( $custom ),
+		'studio_fields' => wp_json_encode( array_merge( $custom, $prepaid > 0 ? array( '_prepaid_cents' => $prepaid, '_prepaid_note' => $pnote ) : array() ) ),
 		'client_fields' => wp_json_encode( array() ),
 		'client_name'   => $client,
 		'client_email'  => sanitize_email( ril_post( 'client_email' ) ),
@@ -647,18 +660,27 @@ add_action( 'admin_post_ril_update', function () {
 	$body      = ril_post_text( 'body' );
 	$name      = ril_post( 'client_name', $c['client_name'] );
 	$total     = '' !== ril_post( 'total' ) ? ril_parse_money( ril_post( 'total' ) ) : $c['total_cents'];
-	$deposit   = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : $c['deposit_cents'];
+	$deposit   = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ( '' !== ril_post( 'total' ) ? ril_default_deposit( $total ) : $c['deposit_cents'] );
 	$fields    = (array) $c['studio_fields'];
+	list( $old_pp, $old_pn ) = ril_prepaid( $c );
+	$prepaid   = isset( $_POST['prepaid'] ) ? ril_parse_money( ril_post( 'prepaid' ) ) : $old_pp;
+	$pnote     = $prepaid > 0 ? ( isset( $_POST['prepaid_note'] ) ? ril_post( 'prepaid_note' ) : $old_pn ) : '';
+	$pp_change = $prepaid !== $old_pp || $pnote !== $old_pn;
+	unset( $fields['_prepaid_cents'], $fields['_prepaid_note'] );
 	$posted    = isset( $_POST['sf'] ) && is_array( $_POST['sf'] ) ? wp_unslash( $_POST['sf'] ) : array();
 	$swap      = array();
-	if ( $total !== $c['total_cents'] || $deposit !== $c['deposit_cents'] ) {
-		$swap[ ril_money( $c['total_cents'] ) ]                                 = ril_money( $total );
-		$swap[ ril_money( $c['deposit_cents'] ) ]                               = ril_money( $deposit );
-		$swap[ ril_money( max( 0, $c['total_cents'] - $c['deposit_cents'] ) ) ] = ril_money( max( 0, $total - $deposit ) );
+	if ( $total !== $c['total_cents'] || $deposit !== $c['deposit_cents'] || $pp_change ) {
+		$swap[ ril_money( $c['total_cents'] ) ]   = ril_money( $total );
+		$swap[ ril_money( $c['deposit_cents'] ) ] = ril_money( $deposit );
+		$swap[ ril_money( ril_balance_cents( $c['total_cents'], $c['deposit_cents'], $old_pp ) ) ] = ril_money( ril_balance_cents( $total, $deposit, $prepaid ) );
+		$swap[ '(' . ril_percent_label( $c['deposit_cents'], $c['total_cents'] ) . ' of the fee)' ] = '(' . ril_percent_label( $deposit, $total ) . ' of the fee)';
 	}
 	foreach ( $posted as $k => $v ) {
 		$k = sanitize_text_field( $k );
 		$v = sanitize_text_field( $v );
+		if ( '_' === substr( $k, 0, 1 ) ) {
+			continue;
+		}
 		if ( isset( $fields[ $k ] ) && '' !== (string) $fields[ $k ] && $v !== $fields[ $k ] && '' !== $v ) {
 			$swap[ (string) $fields[ $k ] ] = $v;
 		}
@@ -675,10 +697,10 @@ add_action( 'admin_post_ril_update', function () {
 		}
 	}
 	$tpl     = $c['template_id'] ? ril_get_template( (int) $c['template_id'] ) : null;
-	$old_all = array_merge( ril_auto_values( $c['client_name'], $c['wedding_date'], $c['total_cents'], $c['deposit_cents'], $c['created_at'] ), array_filter( array_map( 'strval', (array) $c['studio_fields'] ), 'strlen' ) );
+	$old_all = array_merge( ril_auto_values( $c['client_name'], $c['wedding_date'], $c['total_cents'], $c['deposit_cents'], $c['created_at'], $old_pp, $old_pn ), array_filter( array_map( 'strval', $fields_before = array_diff_key( (array) $c['studio_fields'], array( '_prepaid_cents' => 1, '_prepaid_note' => 1 ) ) ), 'strlen' ) );
 	if ( $swap && $tpl && $body === $c['body'] && ril_fill_studio( $tpl['body'], $old_all ) === $c['body'] ) {
 		// Texto não foi mexido à mão: remonta a partir do modelo com os valores novos.
-		$new_all = array_merge( ril_auto_values( $name, $c['wedding_date'], $total, $deposit, $c['created_at'] ), array_filter( array_map( 'strval', $fields ), 'strlen' ) );
+		$new_all = array_merge( ril_auto_values( $name, $c['wedding_date'], $total, $deposit, $c['created_at'], $prepaid, $pnote ), array_filter( array_map( 'strval', $fields ), 'strlen' ) );
 		$body    = ril_fill_studio( $tpl['body'], $new_all );
 	} elseif ( $swap ) {
 		// Texto foi editado à mão: troca os valores antigos pelos novos, se não houver ambiguidade.
@@ -686,7 +708,10 @@ add_action( 'admin_post_ril_update', function () {
 		foreach ( $swap as $from => $to ) {
 			$targets[ $from ][] = $to;
 		}
-		$amounts = array( ril_money( $c['total_cents'] ), ril_money( $c['deposit_cents'] ), ril_money( max( 0, $c['total_cents'] - $c['deposit_cents'] ) ) );
+		if ( $pp_change ) {
+			ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'edit' => 1, 'err' => 'O texto deste contrato foi editado à mão, então o "Pago antes" não pode ser colocado sozinho. Escreva a linha do pagamento direto no texto.' ) );
+		}
+		$amounts = array( ril_money( $c['total_cents'] ), ril_money( $c['deposit_cents'] ), ril_money( ril_balance_cents( $c['total_cents'], $c['deposit_cents'], $old_pp ) ) );
 		if ( count( $amounts ) !== count( array_unique( $amounts ) ) && ( $total !== $c['total_cents'] || $deposit !== $c['deposit_cents'] ) ) {
 			ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'edit' => 1, 'err' => 'O sinal e o saldo tinham o mesmo valor e o texto foi editado à mão, então não dá para trocar os valores sozinho. Atualize os valores direto no texto.' ) );
 		}
@@ -699,7 +724,7 @@ add_action( 'admin_post_ril_update', function () {
 		'link_days'     => max( 1, min( 365, (int) ril_post( 'link_days', 14 ) ) ),
 		'total_cents'   => $total,
 		'deposit_cents' => $deposit,
-		'studio_fields' => $fields,
+		'studio_fields' => array_merge( $fields, $prepaid > 0 ? array( '_prepaid_cents' => $prepaid, '_prepaid_note' => $pnote ) : array() ),
 		'body'          => $body,
 	);
 	$args = array( 'view' => 'contract', 'id' => $c['id'], 'saved' => 1 );

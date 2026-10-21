@@ -13,7 +13,7 @@ const RIL_STUDIO_RE = '/\{\{\s*([^{}]+?)\s*\}\}/u';
 const RIL_CLIENT_RE = '/\[\[\s*([^\[\]]+?)\s*\]\]/u';
 
 function ril_auto_fields() {
-	return array( 'studio_name', 'client_names', 'wedding_date', 'total', 'deposit', 'balance', 'today' );
+	return array( 'studio_name', 'client_names', 'wedding_date', 'total', 'deposit', 'deposit_percent', 'prepaid', 'balance', 'today' );
 }
 
 function ril_unique_fields( $body, $re ) {
@@ -64,6 +64,33 @@ function ril_client_field_names( $body ) {
 }
 
 function ril_fill_studio( $body, $values ) {
+	// Linha começando com "??" só aparece se todos os campos dela tiverem valor (ex.: pagamento antecipado).
+	if ( false === strpos( $body, '??' ) ) {
+		return ril_fill_studio_values( $body, $values );
+	}
+	$lines = preg_split( '/\r?\n/', $body );
+	$out   = array();
+	foreach ( $lines as $line ) {
+		if ( preg_match( '/^\?\?\s?(.*)$/', $line, $mm ) ) {
+			preg_match_all( RIL_STUDIO_RE, $mm[1], $ph );
+			$keep = true;
+			foreach ( $ph[1] as $raw ) {
+				$k = ril_parse_field( $raw )['name'];
+				if ( ! isset( $values[ $k ] ) || '' === (string) $values[ $k ] ) {
+					$keep = false;
+				}
+			}
+			if ( ! $keep ) {
+				continue;
+			}
+			$line = $mm[1];
+		}
+		$out[] = $line;
+	}
+	return ril_fill_studio_values( implode( "\n", $out ), $values );
+}
+
+function ril_fill_studio_values( $body, $values ) {
 	return preg_replace_callback( RIL_STUDIO_RE, function ( $m ) use ( $values ) {
 		$k = ril_parse_field( $m[1] )['name'];
 		return isset( $values[ $k ] ) && '' !== $values[ $k ] ? $values[ $k ] : $m[0];

@@ -8,6 +8,31 @@ function ril_money( $cents ) {
 }
 
 /** "1,500.00", "1500", "$1.500,00" → centavos. */
+/** Saldo até o casamento: total menos sinal menos o que já foi pago antes. */
+function ril_balance_cents( $total, $deposit, $prepaid = 0 ) {
+	return max( 0, (int) $total - (int) $deposit - (int) $prepaid );
+}
+
+/** "40%" (porcentagem do sinal sobre o total). */
+function ril_percent_label( $part, $total ) {
+	if ( $total <= 0 ) {
+		return '';
+	}
+	return rtrim( rtrim( number_format( $part * 100 / $total, 1, '.', '' ), '0' ), '.' ) . '%';
+}
+
+/** Pagamento antecipado guardado no contrato: [centavos, descrição]. */
+function ril_prepaid( $c ) {
+	$f = isset( $c['studio_fields'] ) ? (array) $c['studio_fields'] : array();
+	return array( isset( $f['_prepaid_cents'] ) ? (int) $f['_prepaid_cents'] : 0, isset( $f['_prepaid_note'] ) ? (string) $f['_prepaid_note'] : '' );
+}
+
+/** Sinal padrão a partir do total, pela porcentagem das Configurações. */
+function ril_default_deposit( $total ) {
+	$s = ril_settings();
+	return (int) round( $total * (float) $s['deposit_percent'] / 100 );
+}
+
 function ril_parse_money( $input ) {
 	$clean = preg_replace( '/[^\d.,]/', '', (string) $input );
 	if ( '' === $clean ) {

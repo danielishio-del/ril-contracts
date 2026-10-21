@@ -159,3 +159,4 @@ body.ril-public {
 .ril-hold-badge { background: #efe7f6; color: #5b3d7a; }
 .ril-wrap .ril-field textarea.ril-code { min-height: 480px; }
 .ril-wrap .ril-field select { padding-right: 32px; }
+.ril-money-sum{margin:-4px 0 14px;font-weight:600;color:#3d3a35}

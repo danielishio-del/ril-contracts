@@ -114,6 +114,7 @@ function ril_settings() {
 		'payment_instructions' => '',
 		'paypal_link'          => '',
 		'paypal_fee_percent'   => 3,
+		'deposit_percent'      => 40,
 		'link_days'            => 14,
 		'logo_id'              => 0,
 		'from_name'            => 'Rocker in Love',

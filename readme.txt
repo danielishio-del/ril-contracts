@@ -1,7 +1,7 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
@@ -25,6 +25,12 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 == Listas de opções no modelo ==
 
 * Em Modelos, um campo com opções é escrito assim: {{Coverage hours: 6 hours | 9 hours | 12 hours}}. No "Novo contrato" ele vira uma lista para escolher.
+
+== Valores ==
+
+* O sinal é calculado sozinho (40% do total; dá para mudar a porcentagem em Configurações ou digitar outro valor no contrato).
+* "Pago antes" (opcional): o que o casal já pagou antes do contrato. Entra no contrato como "Paid in advance" e é descontado do saldo.
+* A cláusula 4 mostra sozinha o valor do sinal e a porcentagem.
 
 == Soft hold ==
 

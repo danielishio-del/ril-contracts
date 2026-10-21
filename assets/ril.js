@@ -224,3 +224,38 @@
     });
   }
 })();
+
+/* ---------- Valores: sinal automático e saldo ---------- */
+(function () {
+  "use strict";
+  function parse(v) {
+    var n = parseFloat(String(v || "").replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? 0 : Math.round(n * 100);
+  }
+  function fmt(c) {
+    return (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  document.querySelectorAll("[data-ril-money]").forEach(function (box) {
+    var pct = parseFloat(box.getAttribute("data-pct")) || 0;
+    var total = box.querySelector('input[name="total"]');
+    var dep = box.querySelector('input[name="deposit"]');
+    var pre = box.querySelector('input[name="prepaid"]');
+    var sum = box.parentNode.querySelector("[data-ril-money-sum]");
+    // O sinal acompanha o total até alguém digitar outro valor nele.
+    var auto = !dep.value || parse(dep.value) === Math.round(parse(total.value) * pct / 100);
+    function update() {
+      var t = parse(total.value);
+      if (auto) dep.value = t ? fmt(Math.round(t * pct / 100)) : "";
+      var d = parse(dep.value), p = parse(pre.value);
+      if (!sum) return;
+      if (!t) { sum.textContent = ""; return; }
+      var bal = Math.max(0, t - d - p);
+      var dp = Math.round(d * 1000 / t) / 10;
+      sum.textContent = "Total $" + fmt(t) + (p ? " · Pago antes $" + fmt(p) : "") + " · Sinal $" + fmt(d) + " (" + dp + "%)" + " · Saldo até o casamento $" + fmt(bal) + (d + p > t ? " — atenção: sinal + pago antes passam do total" : "");
+    }
+    total.addEventListener("input", update);
+    pre.addEventListener("input", update);
+    dep.addEventListener("input", function () { auto = dep.value === ""; update(); });
+    update();
+  });
+})();
