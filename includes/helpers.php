@@ -28,9 +28,10 @@ function ril_prepaid( $c ) {
 }
 
 /** Sinal padrão a partir do total, pela porcentagem das Configurações. */
-function ril_default_deposit( $total ) {
-	$s = ril_settings();
-	return (int) round( $total * (float) $s['deposit_percent'] / 100 );
+function ril_default_deposit( $total, $pct = '' ) {
+	$s   = ril_settings();
+	$pct = '' !== (string) $pct ? (float) str_replace( ',', '.', $pct ) : (float) $s['deposit_percent'];
+	return (int) round( $total * max( 0, min( 100, $pct ) ) / 100 );
 }
 
 function ril_parse_money( $input ) {

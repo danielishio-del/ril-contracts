@@ -235,27 +235,39 @@
   function fmt(c) {
     return (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  function pctOf(d, t) {
+    return t ? String(Math.round(d * 1000 / t) / 10) : "";
+  }
   document.querySelectorAll("[data-ril-money]").forEach(function (box) {
-    var pct = parseFloat(box.getAttribute("data-pct")) || 0;
     var total = box.querySelector('input[name="total"]');
+    var pct = box.querySelector('input[name="deposit_pct"]');
     var dep = box.querySelector('input[name="deposit"]');
     var pre = box.querySelector('input[name="prepaid"]');
     var sum = box.parentNode.querySelector("[data-ril-money-sum]");
-    // O sinal acompanha o total até alguém digitar outro valor nele.
-    var auto = !dep.value || parse(dep.value) === Math.round(parse(total.value) * pct / 100);
-    function update() {
-      var t = parse(total.value);
-      if (auto) dep.value = t ? fmt(Math.round(t * pct / 100)) : "";
-      var d = parse(dep.value), p = parse(pre.value);
-      if (!sum) return;
-      if (!t) { sum.textContent = ""; return; }
-      var bal = Math.max(0, t - d - p);
-      var dp = Math.round(d * 1000 / t) / 10;
-      sum.textContent = "Total $" + fmt(t) + (p ? " · Pago antes $" + fmt(p) : "") + " · Sinal $" + fmt(d) + " (" + dp + "%)" + " · Saldo até o casamento $" + fmt(bal) + (d + p > t ? " — atenção: sinal + pago antes passam do total" : "");
+    function pctVal() {
+      var p = parseFloat(String(pct.value).replace(",", "."));
+      return isNaN(p) ? 0 : Math.max(0, Math.min(100, p));
     }
-    total.addEventListener("input", update);
-    pre.addEventListener("input", update);
-    dep.addEventListener("input", function () { auto = dep.value === ""; update(); });
-    update();
+    function fromPct() {
+      var t = parse(total.value);
+      dep.value = t ? fmt(Math.round(t * pctVal() / 100)) : "";
+    }
+    function summary() {
+      if (!sum) return;
+      var t = parse(total.value), d = parse(dep.value), p = parse(pre.value);
+      if (!t) { sum.textContent = ""; return; }
+      sum.textContent = "Total $" + fmt(t) + (p ? " · Pago antes $" + fmt(p) : "") + " · Sinal $" + fmt(d) + " (" + pctOf(d, t) + "%)" + " · Saldo até o casamento $" + fmt(Math.max(0, t - d - p)) + (d + p > t ? " — atenção: sinal + pago antes passam do total" : "");
+    }
+    // Total ou % mudou: recalcula o sinal. Sinal digitado: ajusta a %.
+    total.addEventListener("input", function () { fromPct(); summary(); });
+    pct.addEventListener("input", function () { fromPct(); summary(); });
+    dep.addEventListener("input", function () {
+      var t = parse(total.value);
+      if (t && dep.value !== "") pct.value = pctOf(parse(dep.value), t);
+      summary();
+    });
+    pre.addEventListener("input", summary);
+    if (!dep.value && total.value) fromPct();
+    summary();
   });
 })();

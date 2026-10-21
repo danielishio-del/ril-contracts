@@ -104,7 +104,9 @@ function ril_money_inputs( $total = null, $deposit = null, $prepaid = 0, $note =
 	};
 	$h  = '<div class="ril-grid" data-ril-money data-pct="' . esc_attr( $s['deposit_percent'] ) . '">';
 	$h .= '<label class="ril-field"><span>Total (US$)</span><input name="total" inputmode="decimal" placeholder="5,400.00" value="' . esc_attr( $fmt( $total ) ) . '"></label>';
-	$h .= '<label class="ril-field"><span>Sinal (US$)</span><input name="deposit" inputmode="decimal" placeholder="Calculado sozinho" value="' . esc_attr( $fmt( $deposit ) ) . '"><small>' . esc_html( $s['deposit_percent'] ) . '% do total, calculado sozinho. Pode mudar.</small></label>';
+	$pct = ( null !== $total && $total > 0 && null !== $deposit ) ? rtrim( rtrim( number_format( $deposit * 100 / $total, 1, '.', '' ), '0' ), '.' ) : (string) $s['deposit_percent'];
+	$h .= '<label class="ril-field"><span>Sinal (%)</span><input name="deposit_pct" inputmode="decimal" value="' . esc_attr( $pct ) . '"><small>Mude a porcentagem e o sinal muda junto.</small></label>';
+	$h .= '<label class="ril-field"><span>Sinal (US$)</span><input name="deposit" inputmode="decimal" placeholder="Calculado sozinho" value="' . esc_attr( $fmt( $deposit ) ) . '"><small>Ou digite o valor e a porcentagem se ajusta.</small></label>';
 	$h .= '<label class="ril-field"><span>Pago antes (opcional)</span><input name="prepaid" inputmode="decimal" placeholder="0.00" value="' . esc_attr( $prepaid ? $fmt( $prepaid ) : '' ) . '"><small>Algo que o casal já pagou antes do contrato. É descontado do saldo.</small></label>';
 	$h .= '<label class="ril-field"><span>O que foi pago antes (opcional)</span><input name="prepaid_note" maxlength="120" placeholder="ex.: engagement session paid on May 2" value="' . esc_attr( $note ) . '"><small>Aparece no contrato, em inglês.</small></label>';
 	$h .= '</div><p class="ril-money-sum ril-small" data-ril-money-sum></p>';
@@ -604,7 +606,7 @@ add_action( 'admin_post_ril_create', function () {
 	$s       = ril_settings();
 	$client  = ril_post( 'client_name' );
 	$total   = ril_parse_money( ril_post( 'total' ) );
-	$deposit = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ril_default_deposit( $total );
+	$deposit = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ril_default_deposit( $total, ril_post( 'deposit_pct' ) );
 	$prepaid = ril_parse_money( ril_post( 'prepaid' ) );
 	$pnote   = $prepaid > 0 ? ril_post( 'prepaid_note' ) : '';
 	$date    = preg_match( '/^\d{4}-\d{2}-\d{2}$/', ril_post( 'wedding_date' ) ) ? ril_post( 'wedding_date' ) : '';
@@ -660,7 +662,7 @@ add_action( 'admin_post_ril_update', function () {
 	$body      = ril_post_text( 'body' );
 	$name      = ril_post( 'client_name', $c['client_name'] );
 	$total     = '' !== ril_post( 'total' ) ? ril_parse_money( ril_post( 'total' ) ) : $c['total_cents'];
-	$deposit   = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ( '' !== ril_post( 'total' ) ? ril_default_deposit( $total ) : $c['deposit_cents'] );
+	$deposit   = '' !== ril_post( 'deposit' ) ? ril_parse_money( ril_post( 'deposit' ) ) : ( '' !== ril_post( 'total' ) ? ril_default_deposit( $total, ril_post( 'deposit_pct' ) ) : $c['deposit_cents'] );
 	$fields    = (array) $c['studio_fields'];
 	list( $old_pp, $old_pn ) = ril_prepaid( $c );
 	$prepaid   = isset( $_POST['prepaid'] ) ? ril_parse_money( ril_post( 'prepaid' ) ) : $old_pp;
