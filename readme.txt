@@ -1,7 +1,7 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.4.6
+Stable tag: 1.5.0
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
@@ -31,6 +31,15 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 * Total, Sinal (%) e Sinal (US$) andam juntos: mude a porcentagem e o sinal muda; digite o sinal e a porcentagem se ajusta; mude o total e o sinal segue a porcentagem. O padrão (40%) fica em Configurações.
 * "Pago antes" (opcional): o que o casal já pagou antes do contrato. Entra no contrato como "Paid in advance" e é descontado do saldo.
 * A cláusula 4 mostra sozinha o valor do sinal e a porcentagem.
+
+== E-mails da jornada do casal ==
+
+* Casal assina: recebe "Welcome to the family" com o sinal, Zelle e PayPal.
+* Vocês contrassinam: recebe o contrato final com o PDF.
+* Vocês marcam "Sinal recebido" ou "Pago total": recebe o recibo.
+* 30 dias antes do casamento: cobrança do saldo. 7 dias antes, se ainda não pagou: lembrete.
+* Textos editáveis (e liga/desliga) em Configurações → E-mails da jornada do casal, com "Enviar teste para mim".
+* No contrato, o quadro Pagamento mostra quando sai a próxima cobrança e tem "Enviar cobrança do saldo agora".
 
 == Soft hold ==
 

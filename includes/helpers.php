@@ -170,6 +170,10 @@ function ril_event_labels() {
 		'paid_in_full'  => 'Pagamento total marcado',
 		'unpaid'        => 'Pagamento voltou a pendente',
 		'date_confirmed' => 'Data do casamento confirmada',
+		'mail_signed'   => 'E-mail de boas-vindas (com o sinal) enviado ao casal',
+		'mail_receipt'  => 'Recibo enviado ao casal',
+		'mail_balance'  => 'Cobrança do saldo enviada ao casal',
+		'mail_reminder' => 'Lembrete do saldo enviado ao casal',
 	);
 }
 

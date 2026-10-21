@@ -192,6 +192,8 @@ function ril_page_contract( $id ) {
 		'sent'    => 'Contrato enviado. Copie o link e mande para o casal (se o e-mail automático não estiver ligado).',
 		'done'    => 'Contrato concluído. O PDF final está pronto e foi enviado por e-mail.',
 		'paid'    => 'Pagamento atualizado.',
+		'receipt' => 'Recibo enviado ao casal por e-mail.',
+		'balsent' => 'Cobrança do saldo enviada ao casal.',
 		'created' => 'Rascunho criado. Revise o texto e clique em "Enviar para assinatura".',
 		'confirmed' => 'Data do casamento confirmada.',
 	);
@@ -342,7 +344,15 @@ function ril_page_contract( $id ) {
 				ril_small_form( 'ril_payment', $c['id'], $label, 'ril-btn-secondary', '', array( 'status' => $p ) );
 			}
 		}
-		echo '</div></div>';
+		echo '</div>';
+		$next = ril_journey_next( $c );
+		if ( $next ) {
+			echo '<p class="ril-small ril-muted" style="margin:12px 0 8px">' . esc_html( $next ) . '</p>';
+		}
+		if ( in_array( $st, array( 'signed', 'completed' ), true ) && 'paid_in_full' !== $c['payment_status'] && ril_amount_due( $c ) > 0 && $c['client_email'] ) {
+			ril_small_form( 'ril_send_balance', $c['id'], 'Enviar cobrança do saldo agora', 'ril-btn-secondary', 'Mandar agora para o casal o e-mail com o saldo de ' . ril_money( ril_amount_due( $c ) ) . '?' );
+		}
+		echo '</div>';
 	}
 
 	$events = ril_get_events( $c['id'] );
@@ -478,6 +488,12 @@ function ril_page_settings() {
 	if ( isset( $_GET['saved'] ) ) {
 		ril_notice( 'Configurações salvas.' );
 	}
+	if ( isset( $_GET['testsent'] ) ) {
+		ril_notice( 'E-mail de teste enviado para ' . $s['email'] . '.' );
+	}
+	if ( isset( $_GET['testfail'] ) ) {
+		ril_notice( 'Não consegui enviar o teste. Confira o e-mail do estúdio e o FluentSMTP.', 'error' );
+	}
 	echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="ril-card" style="max-width:820px;margin-top:16px">';
 	wp_nonce_field( 'ril_settings' );
 	echo '<input type="hidden" name="action" value="ril_settings"><h3>Estúdio</h3><div class="ril-grid">';
@@ -504,6 +520,7 @@ function ril_page_settings() {
 	echo '<label class="ril-field"><span>Texto</span><textarea name="email_body" rows="12">' . esc_textarea( $s['email_body'] ) . '</textarea>';
 	echo '<small>Use {first_names} para o primeiro nome do casal (ex.: Ana &amp; John), {client_names} para os nomes completos e {button} onde o botão do contrato deve aparecer. Deixe em branco para voltar ao texto padrão.</small></label>';
 	echo '<label class="ril-field"><span>Texto do botão</span><input name="email_button" value="' . esc_attr( $s['email_button'] ) . '"></label>';
+	ril_journey_settings_html();
 	echo '<h3>Pagamento</h3>';
 	echo '<label class="ril-field"><span>Instruções de pagamento (em inglês, o casal vê depois de assinar)</span><textarea name="payment_instructions" rows="4" placeholder="Zelle: payments@rockerinlove.com (Rocker in Love)&#10;Please include your names in the memo.">' . esc_textarea( $s['payment_instructions'] ) . '</textarea></label>';
 	echo '<div class="ril-grid"><label class="ril-field"><span>Link do PayPal (opcional)</span><input name="paypal_link" value="' . esc_attr( $s['paypal_link'] ) . '" placeholder="https://paypal.me/rockerinlove"><small>Se for paypal.me, o valor entra no link sozinho.</small></label>';
@@ -563,6 +580,25 @@ add_action( 'admin_post_ril_settings', function () {
 		'email_body'           => trim( ril_post_text( 'email_body' ) ) ? sanitize_textarea_field( ril_post_text( 'email_body' ) ) : ril_default_email_body(),
 		'email_button'         => ril_post( 'email_button' ) ? ril_post( 'email_button' ) : 'Review & sign your contract',
 	) );
+	$journey = array();
+	$posted  = isset( $_POST['journey'] ) && is_array( $_POST['journey'] ) ? wp_unslash( $_POST['journey'] ) : array();
+	foreach ( array_keys( ril_journey_defaults() ) as $k ) {
+		$row             = isset( $posted[ $k ] ) && is_array( $posted[ $k ] ) ? $posted[ $k ] : array();
+		$journey[ $k ] = array(
+			'on'      => empty( $row['on'] ) ? 0 : 1,
+			'subject' => isset( $row['subject'] ) ? sanitize_text_field( $row['subject'] ) : '',
+			'body'    => isset( $row['body'] ) ? sanitize_textarea_field( $row['body'] ) : '',
+		);
+		// Texto igual ao padrão não é guardado: assim melhorias futuras no padrão chegam sozinhas.
+		$def = ril_journey_defaults()[ $k ];
+		if ( str_replace( "\r\n", "\n", $journey[ $k ]['body'] ) === $def['body'] ) {
+			$journey[ $k ]['body'] = '';
+		}
+		if ( $journey[ $k ]['subject'] === $def['subject'] ) {
+			$journey[ $k ]['subject'] = '';
+		}
+	}
+	update_option( 'ril_journey_emails', $journey );
 	RIL_Updater::clear();
 	delete_site_transient( 'update_plugins' );
 	wp_safe_redirect( admin_url( 'admin.php?page=ril-contracts-settings&saved=1' ) );
@@ -856,7 +892,27 @@ add_action( 'admin_post_ril_payment', function () {
 	}
 	ril_update_contract( $c['id'], array( 'payment_status' => $status ) );
 	ril_add_event( $c['id'], $status );
-	ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'paid' => 1 ) );
+	$args = array( 'view' => 'contract', 'id' => $c['id'], 'paid' => 1 );
+	$sent = ril_journey_on_payment( $c['id'], $c['payment_status'] );
+	if ( true === $sent ) {
+		$args['receipt'] = 1;
+	} elseif ( false === $sent && ril_journey( 'receipt' )['on'] && $c['client_email'] ) {
+		$args['mailfail'] = 1;
+	}
+	ril_go( $args );
+} );
+
+add_action( 'admin_post_ril_send_balance', function () {
+	$c   = ril_action_contract( 'ril_send_balance' );
+	$due = ril_amount_due( $c );
+	$args = array( 'view' => 'contract', 'id' => $c['id'] );
+	if ( $due > 0 && $c['client_email'] ) {
+		$mail = ril_journey_render( 'balance', $c, array( 'pay' => $due ) );
+		$ok   = ril_mail( $c['client_email'], $mail['subject'], $mail['html'] );
+		ril_add_event( $c['id'], $ok ? 'mail_balance' : 'email_failed', array( 'to' => $c['client_email'], 'about' => 'balance', 'manual' => true ) );
+		$args[ $ok ? 'balsent' : 'mailfail' ] = 1;
+	}
+	ril_go( $args );
 } );
 
 add_action( 'admin_post_ril_cancel', function () {
@@ -972,3 +1028,78 @@ function ril_page_agenda() {
 	}
 	echo '</div></div>';
 }
+
+/* =========================================================
+ * E-mails da jornada: configurações e teste
+ * ======================================================= */
+
+function ril_journey_settings_html() {
+	echo '<h3 id="journey">E-mails da jornada do casal</h3>';
+	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Saem sozinhos, em inglês, na voz da Grasi. Campos: {first_names}, {total}, {deposit}, {deposit_due}, {balance_due}, {amount_paid}, {total_paid}, {payment_date}, {wedding_date}, {days_left}. Numa linha sozinha: {payment} (valor, Zelle e PayPal) e {button} (link do contrato). **texto** fica em negrito. Uma linha que começa com ?? só aparece quando tem valor. Deixe o texto em branco para voltar ao padrão.</p>';
+	$last = get_option( 'ril_journey_last_run' );
+	if ( $last ) {
+		echo '<p class="ril-small ril-muted">Última verificação automática: ' . esc_html( ril_local( $last['at'] ) ) . ' (' . (int) $last['sent'] . ' e-mail(s) enviados).</p>';
+	}
+	foreach ( ril_journey_defaults() as $k => $def ) {
+		$cfg = ril_journey( $k );
+		echo '<details class="ril-card" style="margin:10px 0;padding:14px 18px"><summary style="cursor:pointer"><b>' . esc_html( $def['label'] ) . '</b> <span class="ril-small ril-muted">' . ( $cfg['on'] ? 'ligado' : 'desligado' ) . '</span></summary>';
+		echo '<p class="ril-small ril-muted">' . esc_html( $def['when'] ) . '</p>';
+		if ( 'final' !== $k ) {
+			echo '<label class="ril-check"><input type="checkbox" name="journey[' . esc_attr( $k ) . '][on]" value="1"' . checked( ! empty( $cfg['on'] ), true, false ) . '><span>Enviar este e-mail automaticamente</span></label>';
+		} else {
+			echo '<input type="hidden" name="journey[final][on]" value="1">';
+		}
+		echo '<label class="ril-field"><span>Assunto</span><input name="journey[' . esc_attr( $k ) . '][subject]" value="' . esc_attr( $cfg['subject'] ) . '"></label>';
+		echo '<label class="ril-field"><span>Texto</span><textarea name="journey[' . esc_attr( $k ) . '][body]" rows="14">' . esc_textarea( $cfg['body'] ) . '</textarea></label>';
+		$test = wp_nonce_url( admin_url( 'admin-post.php?action=ril_mail_test&key=' . $k ), 'ril_mail_test' );
+		echo '<a class="ril-btn ril-btn-secondary ril-btn-small" href="' . esc_url( $test ) . '">Enviar teste para mim</a> <span class="ril-small ril-muted">Usa o texto salvo, com um casal de exemplo. Salve antes de testar.</span>';
+		echo '</details>';
+	}
+}
+
+/** Casal de exemplo para os testes. */
+function ril_sample_contract( $status ) {
+	return array(
+		'id'             => 0,
+		'token'          => 'example',
+		'title'          => 'Wedding Photography Contract',
+		'client_name'    => 'Ana Souza & John Miller',
+		'client_email'   => '',
+		'total_cents'    => 540000,
+		'deposit_cents'  => 216000,
+		'payment_status' => $status,
+		'wedding_date'   => wp_date( 'Y-m-d', time() + RIL_BALANCE_DAYS * DAY_IN_SECONDS ),
+		'studio_fields'  => array(),
+		'soft_hold'      => 0,
+	);
+}
+
+add_action( 'admin_post_ril_mail_test', function () {
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_die( 'Sem permissão.' );
+	}
+	check_admin_referer( 'ril_mail_test' );
+	$key = isset( $_GET['key'] ) ? sanitize_key( $_GET['key'] ) : '';
+	$s   = ril_settings();
+	if ( ! isset( ril_journey_defaults()[ $key ] ) || ! is_email( $s['email'] ) ) {
+		wp_safe_redirect( admin_url( 'admin.php?page=ril-contracts-settings&testfail=1#journey' ) );
+		exit;
+	}
+	$map   = array( 'signed' => 'unpaid', 'final' => 'unpaid', 'receipt' => 'deposit_paid', 'balance' => 'deposit_paid', 'reminder' => 'deposit_paid' );
+	$c     = ril_sample_contract( $map[ $key ] );
+	$extra = array();
+	if ( 'signed' === $key ) {
+		$extra['pay'] = $c['deposit_cents'];
+	} elseif ( 'receipt' === $key ) {
+		$extra = array( 'amount_paid' => $c['deposit_cents'], 'due' => ril_amount_due( $c ) );
+	} elseif ( in_array( $key, array( 'balance', 'reminder' ), true ) ) {
+		if ( 'reminder' === $key ) {
+			$c['wedding_date'] = wp_date( 'Y-m-d', time() + RIL_REMINDER_DAYS * DAY_IN_SECONDS );
+		}
+		$extra['pay'] = ril_amount_due( $c );
+	}
+	$mail = ril_journey_render( $key, $c, $extra );
+	$ok   = ril_mail( $s['email'], '[TESTE] ' . $mail['subject'], $mail['html'] );
+	wp_safe_redirect( admin_url( 'admin.php?page=ril-contracts-settings&' . ( $ok ? 'testsent=1' : 'testfail=1' ) . '#journey' ) );
+	exit;
+} );

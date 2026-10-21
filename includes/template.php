@@ -210,7 +210,7 @@ function ril_hold_toggle_html( $ctx ) {
 	$month = isset( $ctx['hold_month'] ) ? (int) $ctx['hold_month'] : 0;
 	$year  = isset( $ctx['hold_year'] ) ? (int) $ctx['hold_year'] : 0;
 	$html  = '<span class="ril-hold" data-ril-hold>';
-	$html .= '<label class="ril-hold-check"><input type="checkbox" name="softhold" value="1"' . checked( $on, true, false ) . '> <span>We don\'t have the exact date yet — hold the month</span></label>';
+	$html .= '<label class="ril-hold-check"><input type="checkbox" name="softhold" value="1"' . checked( $on, true, false ) . '> <span>We don\'t know the exact date yet. Hold the month for us</span></label>';
 	$html .= '<span class="ril-hold-pick"' . ( $on ? '' : ' hidden' ) . '><select name="hold_month" aria-label="Month"><option value="">Month</option>';
 	for ( $m = 1; $m <= 12; $m++ ) {
 		$html .= '<option value="' . $m . '"' . selected( $month, $m, false ) . '>' . gmdate( 'F', mktime( 12, 0, 0, $m, 1, 2000 ) ) . '</option>';

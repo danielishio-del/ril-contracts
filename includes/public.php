@@ -184,6 +184,7 @@ function ril_handle_sign( $c ) {
 	if ( ril_mail_signed_to_studio( $c ) ) {
 		ril_add_event( $c['id'], 'email_sent', array( 'to' => ril_settings()['email'] ) );
 	}
+	ril_journey_on_signed( $c['id'] );
 	return array( 'ok' => true );
 }
 
@@ -269,8 +270,23 @@ function ril_render_client( $c, $status, $state ) {
 						echo '<p class="ril-paynote" style="margin-top:10px">Includes the ' . esc_html( rtrim( rtrim( number_format( (float) $s['paypal_fee_percent'], 2 ), '0' ), '.' ) ) . '% PayPal fee. No fee with Zelle, cash or check.</p>';
 					}
 				}
+			} elseif ( 'deposit_paid' === $c['payment_status'] && ril_amount_due( $c ) > 0 ) {
+				$due = ril_amount_due( $c );
+				echo '<div class="ril-paynote" style="margin-bottom:10px">Retainer received. Thank you!</div>';
+				echo '<div class="ril-eyebrow">Balance</div><div class="ril-amount">' . esc_html( ril_money( $due ) ) . '</div>';
+				echo '<p class="ril-paynote">Due by your wedding day' . ( $c['wedding_date'] ? ', ' . esc_html( ril_long_date( $c['wedding_date'] ) ) : '' ) . '</p>';
+				if ( $s['payment_instructions'] ) {
+					echo '<div class="ril-payinfo">' . nl2br( esc_html( $s['payment_instructions'] ) ) . '</div>';
+				}
+				if ( $s['paypal_link'] ) {
+					$fee = (int) round( $due * (float) $s['paypal_fee_percent'] / 100 );
+					echo '<a class="ril-btn ril-btn-light" target="_blank" rel="noopener" href="' . esc_url( ril_paypal_href( $s['paypal_link'], $due + $fee ) ) . '">Pay with PayPal · ' . esc_html( ril_money( $due + $fee ) ) . '</a>';
+					if ( $fee > 0 ) {
+						echo '<p class="ril-paynote" style="margin-top:10px">Includes the ' . esc_html( rtrim( rtrim( number_format( (float) $s['paypal_fee_percent'], 2 ), '0' ), '.' ) ) . '% PayPal fee. No fee with Zelle, cash or check.</p>';
+					}
+				}
 			} else {
-				echo '<div class="ril-amount" style="font-size:24px">Paid — thank you!</div>';
+				echo '<div class="ril-amount" style="font-size:24px">All paid. Thank you!</div>';
 			}
 			echo '</div>';
 		}

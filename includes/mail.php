@@ -103,14 +103,8 @@ function ril_mail_final( $c, $pdf_bytes ) {
 	wp_mkdir_p( $dir );
 	$file = $dir . '/' . ril_pdf_filename( $c );
 	file_put_contents( $file, $pdf_bytes );
-	$html = ril_email_layout(
-		'<p>Hi ' . esc_html( ril_first_names( $c['client_name'] ) ) . ',</p>'
-		. '<p>It\'s official: your contract is signed by both of us. Attached is your final copy, and you can always find it at the link below.</p>'
-		. '<p>We can\'t wait to celebrate with you!</p>'
-		. '<p style="margin:28px 0;text-align:center">' . ril_email_button( ril_client_url( $c['token'] ), 'View contract' ) . '</p>'
-		. '<p>With love,<br>The ' . esc_html( $s['studio_name'] ) . ' team</p>'
-	);
-	$ok = ril_mail( array_values( $to ), 'Your signed contract with ' . $s['studio_name'], $html, array( $file ) );
+	$mail = ril_journey_render( 'final', $c );
+	$ok   = ril_mail( array_values( $to ), $mail['subject'], $mail['html'], array( $file ) );
 	wp_delete_file( $file );
 	@rmdir( $dir );
 	return $ok;
