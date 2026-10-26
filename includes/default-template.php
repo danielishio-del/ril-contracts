@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! defined( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES' ) ) {
 	// Textos padrão das versões anteriores: se o modelo instalado for igual a um deles, é atualizado.
-	define( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES', 'a6f548ac49963fa05ae042cb15a3640c4f3654a07e2056559159356f128335c7,6a9887c325efada0a03b2c5cfc275249a2d7cbabed0811a244876b4cd0ad5997,8afcecce20732c351332b918e58aaf5ba3ccda939fa43af4a45e5283e991f138,35e8e4e1877155f373db6d1c6a6577632fc7a2a56df1cf98de58c34db5f4c2e2,4d9376dfabac9abe0187cbf85fa5ead465f13ef1cd0bbce0455129334506e652' );
+	define( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES', 'a6f548ac49963fa05ae042cb15a3640c4f3654a07e2056559159356f128335c7,6a9887c325efada0a03b2c5cfc275249a2d7cbabed0811a244876b4cd0ad5997,8afcecce20732c351332b918e58aaf5ba3ccda939fa43af4a45e5283e991f138,35e8e4e1877155f373db6d1c6a6577632fc7a2a56df1cf98de58c34db5f4c2e2,4d9376dfabac9abe0187cbf85fa5ead465f13ef1cd0bbce0455129334506e652,a84680f51f284d80aa9e73e01b56055293040ba4e949032e7588f8bc8054283e' );
 }
 
 return array(
@@ -29,7 +29,7 @@ Reception: [[Reception location]]
 ## Services to be provided by ROCKER IN LOVE PHOTOGRAPHY
 Photograph
 - {{Number of photographers: 1 Photographer | 2 Photographers}}
-- Photography service for event coverage (up to {{Coverage hours: 6 hours | 9 hours | 12 hours}})
+- Photography service for event coverage (up to {{Coverage hours: 2 hours | 6 hours | 9 hours | 12 hours}})
 - Consultation and planning
 - All photos edited given in high resolution
 - Rights given for personal print and share

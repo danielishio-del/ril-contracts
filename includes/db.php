@@ -85,6 +85,7 @@ function ril_install_tables() {
 		$fixes = array(
 			'Engagement Session ($570 value)'                      => 'Engagement Session ($560 value)',
 			'78206 Varner Rd Suite D #1008, Palm Desert, CA 92211' => '68695 F St, Cathedral City, CA 92234, United States',
+			'{{Coverage hours: 6 hours | 9 hours | 12 hours}}'     => '{{Coverage hours: 2 hours | 6 hours | 9 hours | 12 hours}}',
 		);
 		foreach ( $wpdb->get_results( "SELECT id, body FROM $templates", ARRAY_A ) as $row ) {
 			$plain = str_replace( "\r\n", "\n", $row['body'] );
