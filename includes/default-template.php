@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! defined( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES' ) ) {
 	// Textos padrão das versões anteriores: se o modelo instalado for igual a um deles, é atualizado.
-	define( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES', 'a6f548ac49963fa05ae042cb15a3640c4f3654a07e2056559159356f128335c7,6a9887c325efada0a03b2c5cfc275249a2d7cbabed0811a244876b4cd0ad5997,8afcecce20732c351332b918e58aaf5ba3ccda939fa43af4a45e5283e991f138,35e8e4e1877155f373db6d1c6a6577632fc7a2a56df1cf98de58c34db5f4c2e2,4d9376dfabac9abe0187cbf85fa5ead465f13ef1cd0bbce0455129334506e652,a84680f51f284d80aa9e73e01b56055293040ba4e949032e7588f8bc8054283e' );
+	define( 'RIL_DEFAULT_TEMPLATE_OLD_HASHES', 'a6f548ac49963fa05ae042cb15a3640c4f3654a07e2056559159356f128335c7,6a9887c325efada0a03b2c5cfc275249a2d7cbabed0811a244876b4cd0ad5997,8afcecce20732c351332b918e58aaf5ba3ccda939fa43af4a45e5283e991f138,35e8e4e1877155f373db6d1c6a6577632fc7a2a56df1cf98de58c34db5f4c2e2,4d9376dfabac9abe0187cbf85fa5ead465f13ef1cd0bbce0455129334506e652,a84680f51f284d80aa9e73e01b56055293040ba4e949032e7588f8bc8054283e,23bf33d276cc25d237cfbff9c3858d5ad44906265f0aa6251daab571a00d5b8e' );
 }
 
 return array(
@@ -35,7 +35,7 @@ Photograph
 - Rights given for personal print and share
 - Professional post-processing, color correction, and touch-up
 - Password-protected online gallery
-- Our Gift: {{Gift: Engagement Session ($560 value) | Album Design, 20 pages (design only; printed album not included) | Engagement Session ($560 value) and Album Design, 20 pages (design only; printed album not included)}}
+- Our Gift: {{Gift: None | Engagement Session ($560 value) | Album Design, 20 pages (design only; printed album not included) | Engagement Session ($560 value) and Album Design, 20 pages (design only; printed album not included)}}
 
 Fee: {{total}}
 ?? Paid in advance: {{prepaid}}
