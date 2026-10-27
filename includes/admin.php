@@ -314,6 +314,11 @@ function ril_page_contract( $id ) {
 			echo '<p class="ril-small ril-muted" style="margin:10px 0 0">O link expirou. Para reenviar, clique em Editar contrato e salve: a validade é renovada.</p>';
 			echo '<a class="ril-btn ril-btn-secondary ril-btn-small" style="margin-top:8px" href="' . esc_url( ril_admin_url( array( 'view' => 'contract', 'id' => $c['id'], 'edit' => 1 ) ) ) . '">Editar contrato</a>';
 		}
+		if ( 'sent' === $st && $c['client_email'] ) {
+			echo '<div class="ril-actions" style="margin-top:12px">';
+			ril_small_form( 'ril_resend_update_email', $c['id'], 'Reenviar email de atualização', 'ril-btn-secondary', 'Mandar o email de atualização para ' . esc_html( $c['client_email'] ) . '?' );
+			echo '</div>';
+		}
 		echo '</div>';
 	}
 
@@ -785,6 +790,19 @@ add_action( 'admin_post_ril_update', function () {
 		}
 	}
 	ril_go( $args );
+} );
+
+add_action( 'admin_post_ril_resend_update_email', function () {
+	$c = ril_action_contract( 'ril_resend_update_email' );
+	if ( 'sent' !== $c['status'] || ! $c['client_email'] ) {
+		ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'err' => 'Não dá pra reenviar o email agora.' ) );
+	}
+	if ( ril_mail_contract_updated( $c ) ) {
+		ril_add_event( $c['id'], 'email_sent', array( 'to' => $c['client_email'], 'about' => 'resend_update' ) );
+		ril_go( array( 'view' => 'contract', 'id' => $c['id'] ) );
+	} else {
+		ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'mailfail' => 1 ) );
+	}
 } );
 
 add_action( 'admin_post_ril_send', function () {
