@@ -74,7 +74,7 @@ body.ril-public {
 .ril-block { width: 100%; }
 .ril-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.ril-alert { border-radius: 14px; padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
+.ril-alert { border-radius: 14px; padding: 16px 18px; font-size: 14px; margin: 0 0 16px 0; line-height: 1.5; }
 .ril-error { background: var(--ril-bad-bg); color: var(--ril-bad); }
 
 /* Documento */
@@ -117,7 +117,7 @@ body.ril-public {
 .ril-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; margin-top: 12px; }
 .ril-side > * + * { margin-top: 16px; }
 .ril-wrap .ril-doc { padding: 36px 40px; }
-.ril-wrap textarea.ril-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; min-height: 480px; line-height: 1.5; }
+.ril-wrap textarea.ril-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; min-height: 480px; line-height: 1.5; overflow-x: auto; word-wrap: break-word; white-space: pre-wrap; }
 .ril-linkbox { display: flex; gap: 8px; align-items: center; }
 .ril-linkbox input { font-size: 12px !important; }
 .ril-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
