@@ -194,6 +194,19 @@
     });
   });
 
+  // Contrassinar: nome e cargo só aparecem em "Outra pessoa".
+  document.querySelectorAll("[data-ril-signers]").forEach(function (box) {
+    var other = box.parentNode.querySelector("[data-ril-signer-other]");
+    if (!other) return;
+    function apply() {
+      var on = !!box.querySelector('input[value="other"]:checked');
+      other.hidden = !on;
+      other.querySelector('input[name="signer_name"]').required = on;
+    }
+    box.addEventListener("change", apply);
+    apply();
+  });
+
   document.querySelectorAll("[data-ril-logo]").forEach(function (box) {
     var input = box.querySelector('input[name="logo_id"]');
     var preview = box.querySelector(".ril-logo-preview");

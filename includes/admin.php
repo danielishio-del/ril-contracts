@@ -53,6 +53,17 @@ function ril_go( $args ) {
 	exit;
 }
 
+/** Quem já vem escolhido para contrassinar: o último que este login usou, ou o primeiro da lista. */
+function ril_default_signer_index( $signers ) {
+	$last = (string) get_user_meta( get_current_user_id(), 'ril_last_signer', true );
+	foreach ( $signers as $i => $row ) {
+		if ( $row['name'] === $last ) {
+			return $i;
+		}
+	}
+	return 0;
+}
+
 function ril_notice( $msg, $type = 'success' ) {
 	echo '<div class="notice notice-' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
 }
@@ -183,9 +194,11 @@ function ril_page_contract( $id ) {
 	$link    = ril_client_url( $c['token'] );
 	$editing = in_array( $st, array( 'draft', 'sent', 'expired' ), true ) && ! empty( $_GET['edit'] );
 	$first   = preg_split( '/[ &]+/', $c['client_name'] )[0];
+	$signers = ril_signers();
+	$me      = $signers ? $signers[ ril_default_signer_index( $signers ) ]['name'] : $s['studio_name'];
 	$msg     = "Hi {$first}! Here is your contract with {$s['studio_name']} to review and sign: {$link}";
 	$wa      = 'https://wa.me/?text=' . rawurlencode( $msg );
-	$mailto  = 'mailto:' . rawurlencode( $c['client_email'] ) . '?subject=' . rawurlencode( 'Your contract with ' . $s['studio_name'] ) . '&body=' . rawurlencode( "Hi {$c['client_name']},\n\nHere is your contract to review and sign:\n{$link}\n\n" . ( $s['signer_name'] ? $s['signer_name'] : $s['studio_name'] ) );
+	$mailto  = 'mailto:' . rawurlencode( $c['client_email'] ) . '?subject=' . rawurlencode( 'Your contract with ' . $s['studio_name'] ) . '&body=' . rawurlencode( "Hi {$c['client_name']},\n\nHere is your contract to review and sign:\n{$link}\n\n" . $me );
 
 	echo '<div class="wrap ril-wrap">';
 	echo '<p><a href="' . esc_url( ril_admin_url() ) . '">← Contratos</a></p>';
@@ -340,8 +353,19 @@ function ril_page_contract( $id ) {
 		echo '<form method="post" action="' . $post . '" data-ril-require-sig>'; // phpcs:ignore
 		wp_nonce_field( 'ril_countersign_' . $c['id'] );
 		echo '<input type="hidden" name="action" value="ril_countersign"><input type="hidden" name="id" value="' . esc_attr( $c['id'] ) . '">';
-		echo '<label class="ril-field"><span>Quem assina pelo estúdio</span><input name="signer_name" required value="' . esc_attr( $s['signer_name'] ) . '"></label>';
-		echo '<label class="ril-field"><span>Cargo</span><input name="signer_title" value="' . esc_attr( $s['signer_title'] ) . '" placeholder="Owner / Lead Photographer"></label>';
+		$signers = ril_signers();
+		if ( $signers ) {
+			// Um clique para escolher; já vem marcado quem este login usou da última vez.
+			$pick = ril_default_signer_index( $signers );
+			echo '<div class="ril-field" data-ril-signers><span>Quem assina pelo estúdio</span>';
+			foreach ( $signers as $i => $row ) {
+				echo '<label class="ril-check" style="margin:6px 0"><input type="radio" name="signer" value="' . esc_attr( $i ) . '"' . checked( $pick, $i, false ) . '><span>' . esc_html( $row['name'] . ( '' !== $row['title'] ? ' · ' . $row['title'] : '' ) ) . '</span></label>';
+			}
+			echo '<label class="ril-check" style="margin:6px 0"><input type="radio" name="signer" value="other"><span>Outra pessoa</span></label></div>';
+		}
+		echo '<div data-ril-signer-other' . ( $signers ? ' hidden' : '' ) . '>';
+		echo '<label class="ril-field"><span>Nome de quem assina</span><input name="signer_name"' . ( $signers ? '' : ' required' ) . '></label>';
+		echo '<label class="ril-field"><span>Cargo</span><input name="signer_title" placeholder="Owner / Lead Photographer"></label></div>';
 		echo '<div class="ril-field"><span>Assinatura</span>' . ril_signature_pad_html( 'Assine aqui', 'Limpar' ) . '</div>'; // phpcs:ignore
 		echo '<button class="ril-btn ril-block">Contrassinar e concluir</button></form></div>';
 	}
@@ -531,10 +555,18 @@ function ril_page_settings() {
 	echo '<input type="hidden" name="action" value="ril_settings"><h3>Estúdio</h3><div class="ril-grid">';
 	echo '<label class="ril-field"><span>Nome do estúdio</span><input name="studio_name" required value="' . esc_attr( $s['studio_name'] ) . '"></label>';
 	echo '<label class="ril-field"><span>E-mail do estúdio</span><input type="email" name="email" value="' . esc_attr( $s['email'] ) . '"><small>Recebe aviso quando o casal assina e a cópia final.</small></label>';
-	echo '<label class="ril-field"><span>Quem contrassina</span><input name="signer_name" value="' . esc_attr( $s['signer_name'] ) . '" placeholder="Daniel …"></label>';
-	echo '<label class="ril-field"><span>Cargo</span><input name="signer_title" value="' . esc_attr( $s['signer_title'] ) . '" placeholder="Owner / Lead Photographer"></label>';
 	echo '<label class="ril-field"><span>Link vale por (dias), padrão</span><input type="number" min="1" max="365" name="link_days" value="' . esc_attr( $s['link_days'] ) . '"></label>';
-	echo '</div><h3>Logo</h3>';
+	echo '</div><h3>Quem contrassina</h3>';
+	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Na hora de contrassinar, vocês escolhem um destes nomes com um clique. Para tirar alguém, apague o nome.</p>';
+	$rows   = ril_signers();
+	$rows[] = array( 'name' => '', 'title' => '' ); // Linha vazia para cadastrar mais alguém.
+	foreach ( $rows as $i => $row ) {
+		echo '<div class="ril-grid">';
+		echo '<label class="ril-field"><span>Nome</span><input name="signers[' . esc_attr( $i ) . '][name]" value="' . esc_attr( $row['name'] ) . '"></label>';
+		echo '<label class="ril-field"><span>Cargo (opcional)</span><input name="signers[' . esc_attr( $i ) . '][title]" value="' . esc_attr( $row['title'] ) . '" placeholder="Owner / Lead Photographer"></label>';
+		echo '</div>';
+	}
+	echo '<h3>Logo</h3>';
 	$logo_url = ril_logo_url();
 	echo '<div class="ril-logo-field" data-ril-logo>';
 	echo '<div class="ril-logo-preview">' . ( $logo_url ? '<img src="' . esc_url( $logo_url ) . '" alt="">' : '<span class="ril-muted">Nenhuma logo</span>' ) . '</div>';
@@ -593,11 +625,18 @@ function ril_page_settings() {
 
 add_action( 'admin_post_ril_settings', function () {
 	ril_guard( 'ril_settings', ril_settings_cap() );
+	$signers = array();
+	$posted  = isset( $_POST['signers'] ) && is_array( $_POST['signers'] ) ? wp_unslash( $_POST['signers'] ) : array();
+	foreach ( $posted as $row ) {
+		$name = is_array( $row ) && isset( $row['name'] ) ? sanitize_text_field( $row['name'] ) : '';
+		if ( '' !== $name ) {
+			$signers[] = array( 'name' => $name, 'title' => isset( $row['title'] ) ? sanitize_text_field( $row['title'] ) : '' );
+		}
+	}
 	update_option( 'ril_contracts_settings', array(
 		'studio_name'          => ril_post( 'studio_name', 'Rocker in Love' ),
 		'email'                => sanitize_email( ril_post( 'email' ) ),
-		'signer_name'          => ril_post( 'signer_name' ),
-		'signer_title'         => ril_post( 'signer_title' ),
+		'signers'              => $signers,
 		'link_days'            => max( 1, min( 365, (int) ril_post( 'link_days', 14 ) ) ),
 		'payment_instructions' => sanitize_textarea_field( ril_post_text( 'payment_instructions' ) ),
 		'paypal_link'          => esc_url_raw( ril_post( 'paypal_link' ) ),
@@ -886,7 +925,16 @@ add_action( 'admin_post_ril_countersign', function () {
 	if ( 'signed' !== ril_status( $c ) ) {
 		ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'err' => 'O casal ainda não assinou este contrato.' ) );
 	}
-	$name  = ril_post( 'signer_name' );
+	// Alguém da lista (índice) ou "Outra pessoa" (nome digitado).
+	$signers = ril_signers();
+	$pick    = ril_post( 'signer', 'other' );
+	if ( ctype_digit( $pick ) && isset( $signers[ (int) $pick ] ) ) {
+		$name  = $signers[ (int) $pick ]['name'];
+		$title = $signers[ (int) $pick ]['title'];
+	} else {
+		$name  = ril_post( 'signer_name' );
+		$title = ril_post( 'signer_title' );
+	}
 	$image = isset( $_POST['signature'] ) ? ril_clean_signature_image( wp_unslash( $_POST['signature'] ) ) : '';
 	if ( '' === $name || '' === $image ) {
 		ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'err' => 'Digite o nome e desenhe a assinatura.' ) );
@@ -894,7 +942,7 @@ add_action( 'admin_post_ril_countersign', function () {
 	$meta = ril_request_meta();
 	$sig  = array(
 		'name'    => $name,
-		'title'   => ril_post( 'signer_title' ),
+		'title'   => $title,
 		'image'   => $image,
 		'ip'      => $meta['ip'],
 		'ua'      => $meta['ua'],
@@ -912,6 +960,7 @@ add_action( 'admin_post_ril_countersign', function () {
 	}
 	ril_add_event( $c['id'], 'countersigned', array( 'name' => $name ) );
 	ril_add_event( $c['id'], 'completed' );
+	update_user_meta( get_current_user_id(), 'ril_last_signer', $name );
 
 	$fresh = ril_get_contract( $c['id'] );
 	$bytes = ril_build_pdf( $fresh );

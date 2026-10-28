@@ -168,7 +168,7 @@ function ril_build_pdf( $c ) {
 		$txt( $sig ? 'Signed: ' . ril_utc_label( $sig['at'] ) : 'Not signed yet', 'Sans', '', 9, $muted, 13, 16 );
 	};
 	$sig_block( 'Client', $c['client_signature'], $c['client_name'] );
-	$sig_block( 'Photographer', $c['studio_signature'], $s['signer_name'] ? $s['signer_name'] : $s['studio_name'] );
+	$sig_block( 'Photographer', $c['studio_signature'], $s['studio_name'] );
 
 	// Certificado
 	$pdf->AddPage();

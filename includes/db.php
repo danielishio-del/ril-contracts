@@ -121,8 +121,10 @@ function ril_now() {
 function ril_settings() {
 	$defaults = array(
 		'studio_name'          => 'Rocker in Love',
-		'signer_name'          => '',
-		'signer_title'         => '',
+		'signers'              => array(
+			array( 'name' => 'Daniel Correa', 'title' => '' ),
+			array( 'name' => 'Grasiele Favoreto', 'title' => 'Owner' ),
+		),
 		'email'                => get_option( 'admin_email' ),
 		'payment_instructions' => '',
 		'paypal_link'          => '',
@@ -140,6 +142,17 @@ function ril_settings() {
 	);
 	$saved = get_option( 'ril_contracts_settings', array() );
 	return array_merge( $defaults, is_array( $saved ) ? $saved : array() );
+}
+
+/** Quem pode contrassinar pelo estúdio: lista de [name, title]. */
+function ril_signers() {
+	$list = array();
+	foreach ( (array) ril_settings()['signers'] as $row ) {
+		if ( is_array( $row ) && isset( $row['name'] ) && '' !== trim( (string) $row['name'] ) ) {
+			$list[] = array( 'name' => (string) $row['name'], 'title' => isset( $row['title'] ) ? (string) $row['title'] : '' );
+		}
+	}
+	return $list;
 }
 
 function ril_default_email_body() {

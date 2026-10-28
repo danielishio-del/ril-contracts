@@ -1,19 +1,19 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
 
 == Como usar ==
 
-1. Contratos → Configurações: preencha quem contrassina, o e-mail do estúdio, as instruções do Zelle e o link do PayPal.
+1. Contratos → Configurações: confira quem contrassina (já vem com Daniel Correa e Grasiele Favoreto, Owner), o e-mail do estúdio, as instruções do Zelle e o link do PayPal.
 2. Contratos → Novo contrato: nomes do casal, data, valores e detalhes. Clique em "Criar rascunho".
 3. Revise o texto e clique em "Enviar para assinatura".
 4. Copie o link (ou use o botão WhatsApp/E-mail) e mande para o casal.
 5. O casal abre o link no celular, preenche, assina e vê o valor do sinal.
-6. Quando o contrato aparecer como "Casal assinou", abra e contrassine. O PDF final é gerado e enviado por e-mail.
+6. Quando o contrato aparecer como "Casal assinou", abra e contrassine: escolha quem assina com um clique (já vem marcado quem assinou da última vez naquele login), desenhe a assinatura e conclua. O PDF final é gerado e enviado por e-mail.
 7. Quando o dinheiro cair, clique em "Sinal recebido".
 
 == Editar ==
