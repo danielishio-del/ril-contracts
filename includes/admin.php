@@ -97,7 +97,7 @@ function ril_auto_values( $name, $date, $total, $deposit, $created_at, $prepaid 
 		'deposit_percent' => ril_percent_label( $deposit, $total ),
 		'prepaid'         => $prepaid > 0 ? ril_money( $prepaid ) . ( '' !== $prepaid_note ? ' (' . $prepaid_note . ')' : '' ) : '',
 		'balance'         => ril_money( ril_balance_cents( $total, $deposit, $prepaid ) ),
-		'today'           => gmdate( 'F j, Y', $created_at ? strtotime( $created_at . ' UTC' ) : time() ),
+		'today'           => ril_site_date( $created_at ? strtotime( $created_at . ' UTC' ) : time() ),
 	);
 }
 

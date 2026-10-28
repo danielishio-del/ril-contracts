@@ -152,12 +152,7 @@ function ril_days_to_wedding( $c ) {
 
 /** Até quando o link do casal vale: "Friday, November 6 at 2:30 pm PST" (fuso do site, sempre em inglês). */
 function ril_link_expires_label( $c ) {
-	if ( empty( $c['expires_at'] ) ) {
-		return '';
-	}
-	$d = new DateTime( $c['expires_at'], new DateTimeZone( 'UTC' ) );
-	$d->setTimezone( wp_timezone() );
-	return $d->format( 'l, F j \a\t g:i a T' );
+	return empty( $c['expires_at'] ) ? '' : ril_site_date( strtotime( $c['expires_at'] . ' UTC' ), 'l, F j \a\t g:i a T' );
 }
 
 /** Bloco de pagamento (valor, Zelle, PayPal com taxa, link da página). */
@@ -204,7 +199,7 @@ function ril_journey_render( $key, $c, $extra = array() ) {
 		'{all_paid}'     => $due > 0 ? '' : "You're all paid up. Now the only thing left is to enjoy!",
 		'{amount_paid}'  => isset( $extra['amount_paid'] ) ? ril_money( $extra['amount_paid'] ) : '',
 		'{total_paid}'   => ril_money( max( 0, (int) $c['total_cents'] - $due ) ),
-		'{payment_date}' => wp_date( 'F j, Y' ),
+		'{payment_date}' => ril_site_date( time() ),
 		'{wedding_date}' => $c['wedding_date'] ? ril_long_date( $c['wedding_date'] ) : '',
 		'{days_left}'    => null === $days ? '' : ril_days_label( max( 0, $days ) ),
 		'{link_expires}' => ril_link_expires_label( $c ),

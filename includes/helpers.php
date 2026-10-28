@@ -58,6 +58,13 @@ function ril_long_date( $ymd ) {
 	return gmdate( 'F j, Y', strtotime( $ymd . ' 12:00:00 UTC' ) );
 }
 
+/** Um momento (timestamp) no fuso do site, sempre em inglês, para o casal ("June 12, 2027"). */
+function ril_site_date( $ts, $format = 'F j, Y' ) {
+	$d = new DateTime( '@' . (int) $ts );
+	$d->setTimezone( wp_timezone() );
+	return $d->format( $format );
+}
+
 /** Data UTC do banco → horário do site, para o painel. */
 function ril_local( $utc ) {
 	if ( ! $utc ) {
