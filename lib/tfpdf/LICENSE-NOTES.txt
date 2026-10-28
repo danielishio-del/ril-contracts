@@ -1,0 +1,2 @@
+tFPDF 1.33 (https://github.com/Setasign/tFPDF), licença LGPL-2.1.
+Fontes Liberation 2.1 (https://github.com/liberationfonts), licença SIL Open Font License 1.1 (font/unifont/Liberation_LICENSE.txt).

@@ -1,0 +1,4 @@
+# Cache de medidas das fontes que a tFPDF grava ao gerar o PDF.
+lib/tfpdf/font/unifont/*.mtx.php
+lib/tfpdf/font/unifont/*.cw.dat
+lib/tfpdf/font/unifont/*.cw127.php

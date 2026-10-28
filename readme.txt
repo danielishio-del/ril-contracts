@@ -63,4 +63,4 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 
 == Créditos ==
 
-PDF gerado com FPDF (Olivier Plathey), licença livre incluída em lib/fpdf/license.txt.
+PDF gerado com tFPDF 1.33 (Ian Back, baseado no FPDF de Olivier Plathey), licença LGPL-2.1. Fontes Liberation (Red Hat), licença SIL Open Font License 1.1 em lib/tfpdf/font/unifont/Liberation_LICENSE.txt.
