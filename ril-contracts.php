@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Rocker in Love Contracts
  * Description:       Contratos com assinatura eletrônica: crie a partir de um modelo, mande o link para o casal assinar no celular, contrassine e gere o PDF final com certificado de assinatura.
- * Version:           1.5.3
+ * Version:           1.6.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Rocker in Love
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'RIL_CONTRACTS_VERSION', '1.5.3' );
+define( 'RIL_CONTRACTS_VERSION', '1.6.0' );
 if ( ! defined( 'RIL_CONTRACTS_DEFAULT_REPO' ) ) {
 	define( 'RIL_CONTRACTS_DEFAULT_REPO', 'danielishio-del/ril-contracts' );
 }

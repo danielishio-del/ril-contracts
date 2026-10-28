@@ -1,7 +1,7 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.5.3
+Stable tag: 1.6.0
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
@@ -34,6 +34,8 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 
 == E-mails da jornada do casal ==
 
+* Link perto de vencer: 3 dias antes do link vencer, se o casal ainda não assinou, ele recebe um lembrete para assinar. 2 dias antes (ou se o link já venceu), vocês recebem um aviso dizendo se o casal chegou a abrir o link.
+* No contrato, "Renovar link" dá mais prazo sem mexer no texto e pode mandar o link de novo para o casal.
 * Casal assina: recebe "Welcome to the family" com o sinal, Zelle e PayPal.
 * Vocês contrassinam: recebe o contrato final com o PDF.
 * Vocês marcam "Sinal recebido" ou "Pago total": recebe o recibo.
