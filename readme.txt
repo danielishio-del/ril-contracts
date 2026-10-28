@@ -1,7 +1,7 @@
 === Rocker in Love Contracts ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.6.1
+Stable tag: 1.7.0
 License: GPLv2 or later
 
 Contratos com assinatura eletrônica para a Rocker in Love.
@@ -40,6 +40,7 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 * Vocês contrassinam: recebe o contrato final com o PDF.
 * Vocês marcam "Sinal recebido" ou "Pago total": recebe o recibo.
 * 30 dias antes do casamento: cobrança do saldo. 7 dias antes, se ainda não pagou: lembrete.
+* 2 dias depois do casamento: "Here's what happens next", o passo a passo de depois do casamento (edição, galeria em até 30 dias, download, álbum se o presente incluir, backup de 1 ano e o saldo, se ainda faltar pagar).
 * Textos editáveis (e liga/desliga) em Configurações → E-mails da jornada do casal, com "Enviar teste para mim".
 * No contrato, o quadro Pagamento mostra quando sai a próxima cobrança e tem "Enviar cobrança do saldo agora".
 

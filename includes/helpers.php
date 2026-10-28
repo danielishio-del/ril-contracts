@@ -243,6 +243,7 @@ function ril_event_labels() {
 		'link_renewed'  => 'Link renovado',
 		'mail_sign_reminder'  => 'Lembrete para assinar enviado ao casal',
 		'studio_link_warning' => 'Aviso de link vencendo enviado ao estúdio',
+		'mail_after_wedding'  => 'Próximos passos (depois do casamento) enviados ao casal',
 		'mail_signed'   => 'E-mail de boas-vindas (com o sinal) enviado ao casal',
 		'mail_receipt'  => 'Recibo enviado ao casal',
 		'mail_balance'  => 'Cobrança do saldo enviada ao casal',

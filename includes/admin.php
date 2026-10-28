@@ -387,8 +387,7 @@ function ril_page_contract( $id ) {
 			}
 		}
 		echo '</div>';
-		$next = ril_journey_next( $c );
-		if ( $next ) {
+		foreach ( array_filter( array( ril_journey_next( $c ), ril_after_wedding_next( $c ) ) ) as $next ) {
 			echo '<p class="ril-small ril-muted" style="margin:12px 0 8px">' . esc_html( $next ) . '</p>';
 		}
 		if ( in_array( $st, array( 'signed', 'completed' ), true ) && 'paid_in_full' !== $c['payment_status'] && ril_amount_due( $c ) > 0 && $c['client_email'] ) {
@@ -1149,7 +1148,7 @@ function ril_page_agenda() {
 
 function ril_journey_settings_html() {
 	echo '<h3 id="journey">E-mails da jornada do casal</h3>';
-	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Saem sozinhos, em inglês, na voz da Grasi. Campos: {first_names}, {total}, {deposit}, {deposit_due}, {balance_due}, {amount_paid}, {total_paid}, {payment_date}, {wedding_date}, {days_left}, {link_expires} (até quando o link para assinar vale). Numa linha sozinha: {payment} (valor, Zelle e PayPal) e {button} (link do contrato). **texto** fica em negrito. Uma linha que começa com ?? só aparece quando tem valor. Deixe o texto em branco para voltar ao padrão.</p>';
+	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Saem sozinhos, em inglês, na voz da Grasi. Campos: {first_names}, {total}, {deposit}, {deposit_due}, {balance_due}, {amount_paid}, {total_paid}, {payment_date}, {wedding_date}, {days_left}, {link_expires} (até quando o link para assinar vale), {gallery_by} (data do casamento + ' . RIL_GALLERY_DAYS . ' dias), {album} (ex.: 20-page album, vazio se o presente não incluir álbum). Numa linha sozinha: {payment} (valor, Zelle e PayPal) e {button} (link do contrato). **texto** fica em negrito. Uma linha que começa com ?? só aparece quando tem valor. Deixe o texto em branco para voltar ao padrão.</p>';
 	$last = get_option( 'ril_journey_last_run' );
 	if ( $last ) {
 		echo '<p class="ril-small ril-muted">Última verificação automática: ' . esc_html( ril_local( $last['at'] ) ) . ' (' . (int) $last['sent'] . ' e-mail(s) enviados).</p>';
@@ -1196,12 +1195,16 @@ add_action( 'admin_post_ril_mail_test', function () {
 		wp_safe_redirect( admin_url( 'admin.php?page=ril-contracts-settings&testfail=1#journey' ) );
 		exit;
 	}
-	$map   = array( 'sign_reminder' => 'unpaid', 'signed' => 'unpaid', 'final' => 'unpaid', 'receipt' => 'deposit_paid', 'balance' => 'deposit_paid', 'reminder' => 'deposit_paid' );
+	$map   = array( 'sign_reminder' => 'unpaid', 'signed' => 'unpaid', 'final' => 'unpaid', 'receipt' => 'deposit_paid', 'balance' => 'deposit_paid', 'reminder' => 'deposit_paid', 'after_wedding' => 'paid_in_full' );
 	$c     = ril_sample_contract( $map[ $key ] );
 	$extra = array();
 	if ( 'sign_reminder' === $key ) {
 		$c['status']     = 'sent';
 		$c['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + RIL_SIGN_REMINDER_DAYS * DAY_IN_SECONDS );
+	} elseif ( 'after_wedding' === $key ) {
+		// Casamento de 2 dias atrás, com o álbum no presente, para mostrar todas as linhas.
+		$c['wedding_date']  = wp_date( 'Y-m-d', time() - RIL_AFTER_WEDDING_DAYS * DAY_IN_SECONDS );
+		$c['studio_fields'] = array( 'Gift' => 'Engagement Session ($560 value) and Album Design, 20 pages (design only; printed album not included)' );
 	} elseif ( 'signed' === $key ) {
 		$extra['pay'] = $c['deposit_cents'];
 	} elseif ( 'receipt' === $key ) {

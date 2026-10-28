@@ -8,6 +8,7 @@
  * receipt  = pagamento marcado como recebido (recibo)
  * balance  = 30 dias antes do casamento (cobrança do saldo)
  * reminder = 7 dias antes, se o saldo ainda estiver em aberto
+ * after_wedding = 2 dias depois do casamento (próximos passos: edição, galeria, download, álbum)
  *
  * Textos em inglês, na voz da Grasi, editáveis em Configurações.
  * Linha que começa com "??" só aparece se todos os campos dela tiverem valor.
@@ -20,6 +21,9 @@ const RIL_BALANCE_DAYS       = 30;
 const RIL_REMINDER_DAYS      = 7;
 const RIL_SIGN_REMINDER_DAYS = 3; // Lembrete ao casal: dias antes do link vencer.
 const RIL_LINK_WARNING_DAYS  = 2; // Aviso ao estúdio: dias antes do link vencer.
+const RIL_AFTER_WEDDING_DAYS = 2; // Próximos passos: dias depois do casamento.
+const RIL_AFTER_WEDDING_MAX  = 14; // Casamentos mais antigos que isso não recebem (ex.: ao ligar o e-mail).
+const RIL_GALLERY_DAYS       = 30; // Prazo da galeria no contrato (cláusula 5).
 
 function ril_journey_defaults() {
 	$sign = "Love,\nGrasi and the Rocker in Love family";
@@ -101,6 +105,24 @@ function ril_journey_defaults() {
 				. "If you already sent it, ignore me and reply so I can mark it. Can't wait to see you two!\n\n"
 				. "Grasi and the Rocker in Love family",
 		),
+		'after_wedding' => array(
+			'label'   => 'Depois do casamento: próximos passos',
+			'when'    => 'Sai sozinho ' . RIL_AFTER_WEDDING_DAYS . ' dias depois do casamento. Explica a edição, a galeria (até ' . RIL_GALLERY_DAYS . ' dias), o download e o backup. A linha do álbum só aparece se o presente incluir o Album Design; a do saldo, só se ainda faltar pagar.',
+			'on'      => 1,
+			'subject' => "Thank you, {first_names}! Here's what happens next",
+			'body'    => "Hi {first_names}!\n\n"
+				. "What a day! Thank you for trusting us with it. We're still smiling over here.\n\n"
+				. "Here's what happens next, step by step:\n\n"
+				. "**1. We edit every photo.** Color, light and touch-ups, one by one.\n\n"
+				. "**2. Your gallery arrives by {gallery_by}.** It's a private, password-protected gallery on our website. We'll email you the link and the password as soon as it's ready.\n\n"
+				. "**3. You download everything.** All your photos in high resolution, with no watermarks and no extra cost.\n\n"
+				. "?? **4. We design your {album}.** Once your gallery is ready, pick your favorite photos and we'll design the pages together (design only; the printed album is not included).\n\n"
+				. "One important thing: your gallery stays online for one year. After that we no longer keep backup files, so please download your photos and save them in two places, like your computer and a cloud drive.\n\n"
+				. "?? Quick note: your balance of **{balance_due}** is still open. You can pay here:\n\n"
+				. "{payment}\n\n"
+				. "Any question at all, just reply here. It comes straight to me.\n\n"
+				. $sign,
+		),
 	);
 }
 
@@ -148,6 +170,16 @@ function ril_days_to_wedding( $c ) {
 	$today = new DateTime( wp_date( 'Y-m-d' ) );
 	$wed   = new DateTime( $c['wedding_date'] );
 	return (int) $today->diff( $wed )->format( '%r%a' );
+}
+
+/** "20-page album" se o presente do contrato incluir o álbum; vazio se não. */
+function ril_album_label( $c ) {
+	foreach ( (array) $c['studio_fields'] as $k => $v ) {
+		if ( '_' !== substr( (string) $k, 0, 1 ) && preg_match( '/album/i', (string) $v ) ) {
+			return preg_match( '/(\d+)\s*pages?/i', (string) $v, $m ) ? $m[1] . '-page album' : 'album';
+		}
+	}
+	return '';
 }
 
 /** Até quando o link do casal vale: "Friday, November 6 at 2:30 pm PST" (fuso do site, sempre em inglês). */
@@ -203,6 +235,8 @@ function ril_journey_render( $key, $c, $extra = array() ) {
 		'{wedding_date}' => $c['wedding_date'] ? ril_long_date( $c['wedding_date'] ) : '',
 		'{days_left}'    => null === $days ? '' : ril_days_label( max( 0, $days ) ),
 		'{link_expires}' => ril_link_expires_label( $c ),
+		'{gallery_by}'   => $c['wedding_date'] ? gmdate( 'F j', strtotime( $c['wedding_date'] . ' 12:00:00 UTC' ) + RIL_GALLERY_DAYS * DAY_IN_SECONDS ) : '',
+		'{album}'        => ril_album_label( $c ),
 	);
 	// Antes da assinatura o botão chama para assinar; depois, só para ver.
 	$to_sign = isset( $c['status'] ) && 'sent' === $c['status'];
@@ -347,14 +381,32 @@ function ril_link_reminders_daily() {
 	return $sent;
 }
 
-/** Rotina diária: link perto de vencer, cobrança do saldo e lembrete. */
+/** Rotina diária: próximos passos, 2 dias depois do casamento (uma vez por contrato). */
+function ril_after_wedding_daily() {
+	global $wpdb;
+	$rows = $wpdb->get_results( $wpdb->prepare(
+		'SELECT id FROM ' . ril_table( 'contracts' ) . " WHERE status IN ('signed','completed') AND soft_hold = 0 AND client_email <> '' AND wedding_date >= %s AND wedding_date <= %s",
+		wp_date( 'Y-m-d', time() - RIL_AFTER_WEDDING_MAX * DAY_IN_SECONDS ),
+		wp_date( 'Y-m-d', time() - RIL_AFTER_WEDDING_DAYS * DAY_IN_SECONDS )
+	), ARRAY_A );
+	$sent = 0;
+	foreach ( (array) $rows as $r ) {
+		$c = ril_get_contract( (int) $r['id'] );
+		if ( $c && ! ril_has_event( $c['id'], 'mail_after_wedding' ) ) {
+			$sent += ril_journey_send( 'after_wedding', $c, array( 'pay' => ril_amount_due( $c ) ) ) ? 1 : 0;
+		}
+	}
+	return $sent;
+}
+
+/** Rotina diária: link perto de vencer, cobrança do saldo, lembrete e próximos passos. */
 function ril_journey_daily() {
 	global $wpdb;
 	$rows = $wpdb->get_results(
 		'SELECT id FROM ' . ril_table( 'contracts' ) . " WHERE status IN ('signed','completed') AND payment_status <> 'paid_in_full' AND wedding_date <> '' AND client_email <> ''",
 		ARRAY_A
 	);
-	$sent = ril_link_reminders_daily();
+	$sent = ril_link_reminders_daily() + ril_after_wedding_daily();
 	foreach ( (array) $rows as $r ) {
 		$c = ril_get_contract( (int) $r['id'] );
 		if ( ! $c || ! empty( $c['soft_hold'] ) ) {
@@ -441,4 +493,20 @@ function ril_link_next( $c ) {
 		$lines[] = 'Se não assinarem, vocês recebem um aviso em ' . wp_date( 'd/m/Y', ril_next_daily_run( $exp - RIL_LINK_WARNING_DAYS * DAY_IN_SECONDS ) ) . '.';
 	}
 	return $lines;
+}
+
+/** E-mail de próximos passos depois do casamento (linha para o painel). */
+function ril_after_wedding_next( $c ) {
+	if ( ! in_array( ril_status( $c ), array( 'signed', 'completed' ), true ) || ! empty( $c['soft_hold'] ) || empty( $c['wedding_date'] ) || ! $c['client_email'] ) {
+		return '';
+	}
+	$sent = ril_last_event_at( $c['id'], 'mail_after_wedding' );
+	if ( $sent ) {
+		return 'Próximos passos depois do casamento: enviado ao casal em ' . ril_local( $sent ) . '.';
+	}
+	$days = ril_days_to_wedding( $c );
+	if ( ! ril_journey( 'after_wedding' )['on'] || null === $days || $days < -RIL_AFTER_WEDDING_MAX ) {
+		return '';
+	}
+	return 'Próximos passos depois do casamento: sai em ' . wp_date( 'd/m/Y', max( time(), strtotime( $c['wedding_date'] . ' 12:00:00' ) + RIL_AFTER_WEDDING_DAYS * DAY_IN_SECONDS ) ) . '.';
 }
