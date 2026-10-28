@@ -7,6 +7,11 @@ function ril_cap() {
 	return apply_filters( 'ril_contracts_capability', 'edit_pages' );
 }
 
+/** Configurações (incluindo de onde o plugin se atualiza): só administradores. */
+function ril_settings_cap() {
+	return apply_filters( 'ril_contracts_settings_capability', 'manage_options' );
+}
+
 add_action( 'admin_menu', function () {
 	$cap = ril_cap();
 	add_menu_page( 'Contratos', 'Contratos', $cap, 'ril-contracts', 'ril_page_main', 'dashicons-media-document', 26 );
@@ -14,7 +19,7 @@ add_action( 'admin_menu', function () {
 	add_submenu_page( 'ril-contracts', 'Novo contrato', 'Novo contrato', $cap, 'ril-contracts-new', 'ril_page_new' );
 	add_submenu_page( 'ril-contracts', 'Agenda e soft holds', 'Agenda', $cap, 'ril-contracts-agenda', 'ril_page_agenda' );
 	add_submenu_page( 'ril-contracts', 'Modelos', 'Modelos', $cap, 'ril-contracts-templates', 'ril_page_templates' );
-	add_submenu_page( 'ril-contracts', 'Configurações', 'Configurações', $cap, 'ril-contracts-settings', 'ril_page_settings' );
+	add_submenu_page( 'ril-contracts', 'Configurações', 'Configurações', ril_settings_cap(), 'ril-contracts-settings', 'ril_page_settings' );
 } );
 
 add_action( 'admin_enqueue_scripts', function ( $hook ) {
@@ -28,8 +33,8 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	wp_enqueue_script( 'ril-contracts', RIL_CONTRACTS_URL . 'assets/ril.js', array(), RIL_CONTRACTS_VERSION, true );
 } );
 
-function ril_guard( $nonce ) {
-	if ( ! current_user_can( ril_cap() ) ) {
+function ril_guard( $nonce, $cap = '' ) {
+	if ( ! current_user_can( $cap ? $cap : ril_cap() ) ) {
 		wp_die( 'Sem permissão.', 403 );
 	}
 	check_admin_referer( $nonce );
@@ -587,7 +592,7 @@ function ril_page_settings() {
  * ======================================================= */
 
 add_action( 'admin_post_ril_settings', function () {
-	ril_guard( 'ril_settings' );
+	ril_guard( 'ril_settings', ril_settings_cap() );
 	update_option( 'ril_contracts_settings', array(
 		'studio_name'          => ril_post( 'studio_name', 'Rocker in Love' ),
 		'email'                => sanitize_email( ril_post( 'email' ) ),
@@ -1135,10 +1140,7 @@ function ril_sample_contract( $status ) {
 }
 
 add_action( 'admin_post_ril_mail_test', function () {
-	if ( ! current_user_can( 'edit_posts' ) ) {
-		wp_die( 'Sem permissão.' );
-	}
-	check_admin_referer( 'ril_mail_test' );
+	ril_guard( 'ril_mail_test', ril_settings_cap() );
 	$key = isset( $_GET['key'] ) ? sanitize_key( $_GET['key'] ) : '';
 	$s   = ril_settings();
 	if ( ! isset( ril_journey_defaults()[ $key ] ) || ! is_email( $s['email'] ) ) {

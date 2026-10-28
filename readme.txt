@@ -56,7 +56,7 @@ Contratos com assinatura eletrônica para a Rocker in Love.
 == Detalhes ==
 
 * Link do casal: seusite.com/contract/código-único/
-* Quem pode usar o painel: administradores e editores do WordPress.
+* Quem pode usar o painel: administradores e editores do WordPress. Configurações (e-mails, pagamento e atualizações): só administradores.
 * Os dados ficam no banco do próprio WordPress. Desativar ou apagar o plugin não apaga os contratos.
 * Se o site usa plugin de cache, exclua o caminho /contract/ do cache.
 * E-mails saem pelo WordPress. Se o site não envia e-mails bem, use um plugin de SMTP.
