@@ -1,7 +1,8 @@
 <?php
 /**
- * Jornada do casal: e-mails automáticos depois do contrato.
+ * Jornada do casal: e-mails automáticos em volta do contrato.
  *
+ * sign_reminder = link perto de vencer e o casal ainda não assinou
  * signed   = casal assinou (boas-vindas + sinal)
  * final    = estúdio contrassinou (PDF final)
  * receipt  = pagamento marcado como recebido (recibo)
@@ -15,13 +16,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const RIL_BALANCE_DAYS  = 30;
-const RIL_REMINDER_DAYS = 7;
+const RIL_BALANCE_DAYS       = 30;
+const RIL_REMINDER_DAYS      = 7;
+const RIL_SIGN_REMINDER_DAYS = 3; // Lembrete ao casal: dias antes do link vencer.
+const RIL_LINK_WARNING_DAYS  = 2; // Aviso ao estúdio: dias antes do link vencer.
 
 function ril_journey_defaults() {
 	$sign = "Love,\nGrasi and the Rocker in Love family";
 	return array(
-		'signed'   => array(
+		'sign_reminder' => array(
+			'label'   => 'Lembrete para assinar (link perto de vencer)',
+			'when'    => 'Sai sozinho ' . RIL_SIGN_REMINDER_DAYS . ' dias antes do link vencer, se o casal ainda não assinou. É também o e-mail que vai quando vocês clicam em "Renovar link".',
+			'on'      => 1,
+			'subject' => 'Your contract is waiting for you, {first_names}',
+			'body'    => "Hi {first_names}!\n\n"
+				. "Just a little nudge: your contract is still waiting for your signature. We'd love to make it official!\n\n"
+				. "?? Your link is open until **{link_expires}**.\n\n"
+				. "{button}\n\n"
+				. "It only takes a few minutes, right from your phone. Any question at all, just reply here. It comes straight to me.\n\n"
+				. $sign,
+		),
+		'signed'        => array(
 			'label'   => 'Boas-vindas depois que o casal assina',
 			'when'    => 'Sai na hora em que o casal assina. Leva o valor do sinal e as formas de pagamento.',
 			'on'      => 1,
@@ -37,7 +52,7 @@ function ril_journey_defaults() {
 				. "This is not a photo shoot. It's your day, and we're here to help you live every second of it.\n\n"
 				. $sign,
 		),
-		'final'    => array(
+		'final'         => array(
 			'label'   => 'Contrato final (com o PDF)',
 			'when'    => 'Sai quando vocês contrassinam. O PDF vai anexado. Sempre ligado.',
 			'on'      => 1,
@@ -48,7 +63,7 @@ function ril_journey_defaults() {
 				. "We can't wait to celebrate with you!\n\n"
 				. $sign,
 		),
-		'receipt'  => array(
+		'receipt'       => array(
 			'label'   => 'Recibo de pagamento',
 			'when'    => 'Sai quando vocês clicam em "Sinal recebido" ou "Pago total" no contrato.',
 			'on'      => 1,
@@ -62,7 +77,7 @@ function ril_journey_defaults() {
 				. "Keep this email as your receipt. Any question, just reply here. It comes straight to me.\n\n"
 				. $sign,
 		),
-		'balance'  => array(
+		'balance'       => array(
 			'label'   => 'Cobrança do saldo (30 dias antes)',
 			'when'    => 'Sai sozinho 30 dias antes do casamento, se ainda houver saldo.',
 			'on'      => 1,
@@ -74,7 +89,7 @@ function ril_journey_defaults() {
 				. "Once this is done, you can forget about everything and just live your day. Real moments, real people, no posing marathon. That's the whole point.\n\n"
 				. "See you soon,\nGrasi and the Rocker in Love family",
 		),
-		'reminder' => array(
+		'reminder'      => array(
 			'label'   => 'Lembrete do saldo (7 dias antes)',
 			'when'    => 'Sai sozinho 7 dias antes do casamento, só se o saldo ainda não estiver marcado como pago.',
 			'on'      => 1,
@@ -135,6 +150,16 @@ function ril_days_to_wedding( $c ) {
 	return (int) $today->diff( $wed )->format( '%r%a' );
 }
 
+/** Até quando o link do casal vale: "Friday, November 6 at 2:30 pm PST" (fuso do site, sempre em inglês). */
+function ril_link_expires_label( $c ) {
+	if ( empty( $c['expires_at'] ) ) {
+		return '';
+	}
+	$d = new DateTime( $c['expires_at'], new DateTimeZone( 'UTC' ) );
+	$d->setTimezone( wp_timezone() );
+	return $d->format( 'l, F j \a\t g:i a T' );
+}
+
 /** Bloco de pagamento (valor, Zelle, PayPal com taxa, link da página). */
 function ril_payment_block_html( $c, $amount ) {
 	if ( $amount <= 0 ) {
@@ -182,10 +207,14 @@ function ril_journey_render( $key, $c, $extra = array() ) {
 		'{payment_date}' => wp_date( 'F j, Y' ),
 		'{wedding_date}' => $c['wedding_date'] ? ril_long_date( $c['wedding_date'] ) : '',
 		'{days_left}'    => null === $days ? '' : ril_days_label( max( 0, $days ) ),
+		'{link_expires}' => ril_link_expires_label( $c ),
 	);
-	$blocks = array(
+	// Antes da assinatura o botão chama para assinar; depois, só para ver.
+	$to_sign = isset( $c['status'] ) && 'sent' === $c['status'];
+	$label   = $to_sign ? ( $s['email_button'] ? $s['email_button'] : 'Review & sign your contract' ) : 'View your contract';
+	$blocks  = array(
 		'{payment}' => ril_payment_block_html( $c, $pay_for ),
-		'{button}'  => '<p style="margin:24px 0;text-align:center">' . ril_email_button( ril_client_url( $c['token'] ), 'View your contract' ) . '</p>',
+		'{button}'  => '<p style="margin:24px 0;text-align:center">' . ril_email_button( ril_client_url( $c['token'] ), $label ) . '</p>',
 	);
 
 	// Linhas "??": só ficam se todos os campos tiverem valor.
@@ -233,6 +262,20 @@ function ril_last_event_at( $contract_id, $type ) {
 	return $wpdb->get_var( $wpdb->prepare( 'SELECT at FROM ' . ril_table( 'events' ) . ' WHERE contract_id = %d AND type = %s ORDER BY at DESC, id DESC LIMIT 1', $contract_id, $type ) );
 }
 
+/** Se o evento aconteceu a partir de um momento (timestamp). */
+function ril_has_event_since( $contract_id, $type, $since ) {
+	global $wpdb;
+	return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . ril_table( 'events' ) . ' WHERE contract_id = %d AND type = %s AND at >= %s LIMIT 1', $contract_id, $type, gmdate( 'Y-m-d H:i:s', $since ) ) );
+}
+
+/**
+ * Começo do prazo atual do link (quando foi enviado ou renovado), em timestamp.
+ * Enviar, editar depois de enviado e renovar sempre fazem expires_at = agora + link_days.
+ */
+function ril_link_period_start( $c ) {
+	return strtotime( $c['expires_at'] . ' UTC' ) - max( 1, (int) $c['link_days'] ) * DAY_IN_SECONDS;
+}
+
 /** Envia um e-mail da jornada ao casal e registra no histórico. Devolve true/false. */
 function ril_journey_send( $key, $c, $extra = array(), $attachments = array(), $cc_studio = false ) {
 	$cfg = ril_journey( $key );
@@ -277,14 +320,46 @@ function ril_journey_on_payment( $contract_id, $before ) {
 	return ril_journey_send( 'receipt', $c, array( 'amount_paid' => $paid, 'due' => $now ) );
 }
 
-/** Rotina diária: cobrança do saldo e lembrete. */
+/**
+ * Rotina diária do link: lembrete ao casal e aviso ao estúdio enquanto o contrato não é assinado.
+ * Cada um sai uma vez por prazo; renovar o link (ou editar depois de enviado) começa um prazo novo.
+ */
+function ril_link_reminders_daily() {
+	global $wpdb;
+	// Contratos esperando assinatura, incluindo links que venceram há até 7 dias.
+	$rows = $wpdb->get_results( $wpdb->prepare(
+		'SELECT id FROM ' . ril_table( 'contracts' ) . " WHERE status = 'sent' AND expires_at IS NOT NULL AND expires_at > %s",
+		gmdate( 'Y-m-d H:i:s', time() - 7 * DAY_IN_SECONDS )
+	), ARRAY_A );
+	$sent = 0;
+	foreach ( (array) $rows as $r ) {
+		$c = ril_get_contract( (int) $r['id'] );
+		if ( ! $c ) {
+			continue;
+		}
+		$start = ril_link_period_start( $c );
+		$left  = strtotime( $c['expires_at'] . ' UTC' ) - time();
+		// Casal: link perto de vencer, e mandado há pelo menos 2 dias (para não chegar junto com o link).
+		if ( $left > 0 && $left <= RIL_SIGN_REMINDER_DAYS * DAY_IN_SECONDS && time() - $start >= 2 * DAY_IN_SECONDS && ! ril_has_event_since( $c['id'], 'mail_sign_reminder', $start ) ) {
+			$sent += ril_journey_send( 'sign_reminder', $c ) ? 1 : 0;
+		}
+		// Estúdio: link perto de vencer ou já vencido.
+		if ( $left <= RIL_LINK_WARNING_DAYS * DAY_IN_SECONDS && ! ril_has_event_since( $c['id'], 'studio_link_warning', $start ) && ril_mail_link_warning_to_studio( $c ) ) {
+			ril_add_event( $c['id'], 'studio_link_warning', array( 'to' => ril_settings()['email'], 'expires' => $c['expires_at'] ) );
+			$sent++;
+		}
+	}
+	return $sent;
+}
+
+/** Rotina diária: link perto de vencer, cobrança do saldo e lembrete. */
 function ril_journey_daily() {
 	global $wpdb;
 	$rows = $wpdb->get_results(
 		'SELECT id FROM ' . ril_table( 'contracts' ) . " WHERE status IN ('signed','completed') AND payment_status <> 'paid_in_full' AND wedding_date <> '' AND client_email <> ''",
 		ARRAY_A
 	);
-	$sent = 0;
+	$sent = ril_link_reminders_daily();
 	foreach ( (array) $rows as $r ) {
 		$c = ril_get_contract( (int) $r['id'] );
 		if ( ! $c || ! empty( $c['soft_hold'] ) ) {
@@ -337,4 +412,38 @@ function ril_journey_next( $c ) {
 		return 'Lembrete do saldo: sai em ' . wp_date( 'd/m/Y', max( time(), $wed - RIL_REMINDER_DAYS * DAY_IN_SECONDS ) ) . ', se ainda não estiver pago.';
 	}
 	return '';
+}
+
+/** Primeira rodada da rotina diária (9h) a partir de um momento. */
+function ril_next_daily_run( $at ) {
+	$next = wp_next_scheduled( 'ril_journey_daily' );
+	if ( ! $next || $at <= $next ) {
+		return $next ? $next : $at;
+	}
+	return $next + (int) ceil( ( $at - $next ) / DAY_IN_SECONDS ) * DAY_IN_SECONDS;
+}
+
+/** Lembrete e aviso do link enquanto o casal não assina (linhas para mostrar no painel). */
+function ril_link_next( $c ) {
+	if ( 'sent' !== ril_status( $c ) || empty( $c['expires_at'] ) ) {
+		return array();
+	}
+	$start = ril_link_period_start( $c );
+	$exp   = strtotime( $c['expires_at'] . ' UTC' );
+	$lines = array();
+	if ( $c['client_email'] ) {
+		$last = ril_last_event_at( $c['id'], 'mail_sign_reminder' );
+		if ( $last && strtotime( $last . ' UTC' ) >= $start ) {
+			$lines[] = 'Lembrete para assinar enviado ao casal em ' . ril_local( $last ) . '.';
+		} elseif ( ril_journey( 'sign_reminder' )['on'] ) {
+			$at = ril_next_daily_run( max( $exp - RIL_SIGN_REMINDER_DAYS * DAY_IN_SECONDS, $start + 2 * DAY_IN_SECONDS ) );
+			if ( $at < $exp ) {
+				$lines[] = 'Lembrete para assinar: sai em ' . wp_date( 'd/m/Y', $at ) . ', se o casal ainda não tiver assinado.';
+			}
+		}
+	}
+	if ( ril_settings()['email'] && ! ril_has_event_since( $c['id'], 'studio_link_warning', $start ) ) {
+		$lines[] = 'Se não assinarem, vocês recebem um aviso em ' . wp_date( 'd/m/Y', ril_next_daily_run( $exp - RIL_LINK_WARNING_DAYS * DAY_IN_SECONDS ) ) . '.';
+	}
+	return $lines;
 }

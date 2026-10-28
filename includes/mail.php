@@ -135,3 +135,31 @@ function ril_mail_contract_updated( $c ) {
 	);
 	return ril_mail( $c['client_email'], 'Your contract was updated', $html );
 }
+
+/** Aviso ao estúdio: o link do casal está para vencer (ou venceu) sem assinatura. */
+function ril_mail_link_warning_to_studio( $c ) {
+	$s = ril_settings();
+	if ( ! $s['email'] ) {
+		return false;
+	}
+	$expired = strtotime( $c['expires_at'] . ' UTC' ) <= time();
+	$views   = array_filter( ril_get_events( $c['id'] ), function ( $e ) {
+		return 'viewed' === $e['type'];
+	} );
+	if ( $views ) {
+		$last = end( $views );
+		$seen = 1 === count( $views ) ? 'O casal abriu o link 1 vez, em ' . ril_local( $last['at'] ) . '.' : 'O casal abriu o link ' . count( $views ) . ' vezes, a última em ' . ril_local( $last['at'] ) . '.';
+	} else {
+		$seen = 'O casal ainda não abriu o link.';
+	}
+	$reminded = ril_last_event_at( $c['id'], 'mail_sign_reminder' );
+	$html     = ril_email_layout(
+		'<p><b>' . esc_html( $c['client_name'] ) . '</b> ainda não assinou o contrato <b>' . esc_html( $c['title'] ) . '</b>.</p>'
+		. '<p>' . ( $expired ? 'O link venceu em ' : 'O link vence em ' ) . '<b>' . esc_html( ril_local( $c['expires_at'] ) ) . '</b>.</p>'
+		. '<p>' . esc_html( $seen ) . '</p>'
+		. ( $reminded && strtotime( $reminded . ' UTC' ) >= ril_link_period_start( $c ) ? '<p>O lembrete para assinar foi enviado ao casal em ' . esc_html( ril_local( $reminded ) ) . '.</p>' : '' )
+		. '<p>Para dar mais prazo, abra o contrato e clique em "Renovar link".</p>'
+		. '<p style="margin:24px 0">' . ril_email_button( ril_admin_url( array( 'view' => 'contract', 'id' => $c['id'] ) ), 'Abrir o contrato' ) . '</p>'
+	);
+	return ril_mail( $s['email'], ( $expired ? 'Link venceu sem assinatura: ' : 'Link vence em breve: ' ) . $c['client_name'], $html );
+}

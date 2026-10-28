@@ -196,6 +196,8 @@ function ril_page_contract( $id ) {
 		'balsent' => 'Cobrança do saldo enviada ao casal.',
 		'created' => 'Rascunho criado. Revise o texto e clique em "Enviar para assinatura".',
 		'confirmed' => 'Data do casamento confirmada.',
+		'renewed'   => 'Link renovado. O casal assina no mesmo link de antes.',
+		'linksent'  => 'Link enviado de novo ao casal por e-mail.',
 	);
 	foreach ( $notices as $k => $m ) {
 		if ( isset( $_GET[ $k ] ) ) {
@@ -309,15 +311,21 @@ function ril_page_contract( $id ) {
 			if ( $c['expires_at'] ) {
 				echo '<p class="ril-small ril-muted" style="margin:10px 0 0">Vale até ' . esc_html( ril_local( $c['expires_at'] ) ) . '.</p>';
 			}
+			foreach ( ril_link_next( $c ) as $line ) {
+				echo '<p class="ril-small ril-muted" style="margin:4px 0 0">' . esc_html( $line ) . '</p>';
+			}
 		}
 		if ( 'expired' === $st ) {
-			echo '<p class="ril-small ril-muted" style="margin:10px 0 0">O link expirou. Para reenviar, clique em Editar contrato e salve: a validade é renovada.</p>';
+			echo '<p class="ril-small ril-muted" style="margin:10px 0 0">O link venceu em ' . esc_html( ril_local( $c['expires_at'] ) ) . ' e o casal não consegue mais assinar. Renove o link abaixo, ou edite o contrato e salve (isso também renova).</p>';
 			echo '<a class="ril-btn ril-btn-secondary ril-btn-small" style="margin-top:8px" href="' . esc_url( ril_admin_url( array( 'view' => 'contract', 'id' => $c['id'], 'edit' => 1 ) ) ) . '">Editar contrato</a>';
 		}
 		if ( 'sent' === $st && $c['client_email'] ) {
 			echo '<div class="ril-actions" style="margin-top:12px">';
 			ril_small_form( 'ril_resend_update_email', $c['id'], 'Reenviar email de atualização', 'ril-btn-secondary', 'Mandar o email de atualização para ' . esc_html( $c['client_email'] ) . '?' );
 			echo '</div>';
+		}
+		if ( in_array( $st, array( 'sent', 'expired' ), true ) ) {
+			ril_renew_link_form( $c, $st );
 		}
 		echo '</div>';
 	}
@@ -385,6 +393,20 @@ function ril_small_form( $action, $id, $label, $class, $confirm = '', $extra = a
 		echo '<input type="hidden" name="' . esc_attr( $k ) . '" value="' . esc_attr( $v ) . '">';
 	}
 	echo '<button class="ril-btn ril-btn-small ' . esc_attr( $class ) . '">' . esc_html( $label ) . '</button></form>';
+}
+
+/** Renovar o link do casal: mais link_days a partir de agora, com opção de mandar o link de novo. */
+function ril_renew_link_form( $c, $st ) {
+	$days = max( 1, (int) $c['link_days'] );
+	echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-top:14px;padding-top:12px;border-top:1px solid #deddd7">';
+	wp_nonce_field( 'ril_renew_link_' . $c['id'] );
+	echo '<input type="hidden" name="action" value="ril_renew_link"><input type="hidden" name="id" value="' . esc_attr( $c['id'] ) . '">';
+	if ( $c['client_email'] ) {
+		// Link vencido: o casal precisa saber que pode assinar de novo.
+		echo '<label class="ril-check" style="margin:0 0 10px"><input type="checkbox" name="email" value="1"' . checked( 'expired' === $st, true, false ) . '><span>Mandar o link de novo para ' . esc_html( $c['client_email'] ) . '</span></label>';
+	}
+	echo '<button class="ril-btn ril-btn-secondary ril-btn-small">Renovar link</button>';
+	echo '<p class="ril-small ril-muted" style="margin:6px 0 0">Passa a valer por ' . esc_html( 1 === $days ? '1 dia' : $days . ' dias' ) . ' a partir de agora. O texto do contrato não muda.</p></form>';
 }
 
 /* =========================================================
@@ -805,6 +827,26 @@ add_action( 'admin_post_ril_resend_update_email', function () {
 	}
 } );
 
+add_action( 'admin_post_ril_renew_link', function () {
+	$c = ril_action_contract( 'ril_renew_link' );
+	if ( 'sent' !== $c['status'] ) {
+		ril_go( array( 'view' => 'contract', 'id' => $c['id'], 'err' => 'Só dá para renovar o link enquanto o casal não assinou.' ) );
+	}
+	$expires = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS * max( 1, (int) $c['link_days'] ) );
+	ril_update_contract( $c['id'], array( 'expires_at' => $expires ) );
+	ril_add_event( $c['id'], 'link_renewed', array( 'expires' => $expires ) );
+	$args = array( 'view' => 'contract', 'id' => $c['id'], 'renewed' => 1 );
+	if ( ! empty( $_POST['email'] ) && $c['client_email'] ) {
+		// Envio manual: sai mesmo com o lembrete automático desligado.
+		$fresh = ril_get_contract( $c['id'] );
+		$mail  = ril_journey_render( 'sign_reminder', $fresh );
+		$ok    = ril_mail( $fresh['client_email'], $mail['subject'], $mail['html'] );
+		ril_add_event( $c['id'], $ok ? 'email_sent' : 'email_failed', array( 'to' => $fresh['client_email'], 'about' => 'link_renewed' ) );
+		$args[ $ok ? 'linksent' : 'mailfail' ] = 1;
+	}
+	ril_go( $args );
+} );
+
 add_action( 'admin_post_ril_send', function () {
 	$c = ril_action_contract( 'ril_send' );
 	if ( 'draft' !== $c['status'] ) {
@@ -1053,7 +1095,7 @@ function ril_page_agenda() {
 
 function ril_journey_settings_html() {
 	echo '<h3 id="journey">E-mails da jornada do casal</h3>';
-	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Saem sozinhos, em inglês, na voz da Grasi. Campos: {first_names}, {total}, {deposit}, {deposit_due}, {balance_due}, {amount_paid}, {total_paid}, {payment_date}, {wedding_date}, {days_left}. Numa linha sozinha: {payment} (valor, Zelle e PayPal) e {button} (link do contrato). **texto** fica em negrito. Uma linha que começa com ?? só aparece quando tem valor. Deixe o texto em branco para voltar ao padrão.</p>';
+	echo '<p class="ril-small ril-muted" style="margin-top:-4px">Saem sozinhos, em inglês, na voz da Grasi. Campos: {first_names}, {total}, {deposit}, {deposit_due}, {balance_due}, {amount_paid}, {total_paid}, {payment_date}, {wedding_date}, {days_left}, {link_expires} (até quando o link para assinar vale). Numa linha sozinha: {payment} (valor, Zelle e PayPal) e {button} (link do contrato). **texto** fica em negrito. Uma linha que começa com ?? só aparece quando tem valor. Deixe o texto em branco para voltar ao padrão.</p>';
 	$last = get_option( 'ril_journey_last_run' );
 	if ( $last ) {
 		echo '<p class="ril-small ril-muted">Última verificação automática: ' . esc_html( ril_local( $last['at'] ) ) . ' (' . (int) $last['sent'] . ' e-mail(s) enviados).</p>';
@@ -1103,10 +1145,13 @@ add_action( 'admin_post_ril_mail_test', function () {
 		wp_safe_redirect( admin_url( 'admin.php?page=ril-contracts-settings&testfail=1#journey' ) );
 		exit;
 	}
-	$map   = array( 'signed' => 'unpaid', 'final' => 'unpaid', 'receipt' => 'deposit_paid', 'balance' => 'deposit_paid', 'reminder' => 'deposit_paid' );
+	$map   = array( 'sign_reminder' => 'unpaid', 'signed' => 'unpaid', 'final' => 'unpaid', 'receipt' => 'deposit_paid', 'balance' => 'deposit_paid', 'reminder' => 'deposit_paid' );
 	$c     = ril_sample_contract( $map[ $key ] );
 	$extra = array();
-	if ( 'signed' === $key ) {
+	if ( 'sign_reminder' === $key ) {
+		$c['status']     = 'sent';
+		$c['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + RIL_SIGN_REMINDER_DAYS * DAY_IN_SECONDS );
+	} elseif ( 'signed' === $key ) {
 		$extra['pay'] = $c['deposit_cents'];
 	} elseif ( 'receipt' === $key ) {
 		$extra = array( 'amount_paid' => $c['deposit_cents'], 'due' => ril_amount_due( $c ) );

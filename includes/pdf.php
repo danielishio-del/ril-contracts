@@ -186,6 +186,7 @@ function ril_build_pdf( $c ) {
 		'created'       => 'Created',
 		'edited'        => 'Text edited',
 		'sent'          => 'Sent to client',
+		'link_renewed'  => 'Signing link renewed',
 		'email_sent'    => 'Email sent',
 		'viewed'        => 'Viewed by client',
 		'signed'        => 'Signed by client',
